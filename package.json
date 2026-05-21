@@ -4,6 +4,6 @@
   "description": "Assistant IA performant propulsé par Groq",
   "private": true,
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   }
 }
