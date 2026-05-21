@@ -1,0 +1,9 @@
+{
+  "name": "ia-performante",
+  "version": "1.0.0",
+  "description": "Assistant IA performant propulsé par Groq",
+  "private": true,
+  "engines": {
+    "node": "18.x"
+  }
+}
