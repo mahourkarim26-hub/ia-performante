@@ -55,17 +55,14 @@ export default async function handler(req, res) {
     if (!req.body || !Array.isArray(req.body.messages)) {
       return res.status(400).json({ error: { message: 'Messages invalides' } });
     }
-
     const messages = req.body.messages.slice(-20).map(m => ({
       role: m.role,
-      content: m.content
+      content: String(m.content || '')
     }));
-
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: { message: 'Clé API manquante' } });
     }
-
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -79,7 +76,6 @@ export default async function handler(req, res) {
         max_tokens: 2048
       })
     });
-
     const data = await response.json();
     if (!response.ok) {
       return res.status(response.status).json({
