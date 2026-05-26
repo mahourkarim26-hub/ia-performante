@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
   <title>IA Performante</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <!-- PDF.js pour extraire le texte des PDFs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;font-family:'Inter',sans-serif;background:#0a1628;color:#e8f5e9;overflow:hidden}
@@ -85,30 +87,23 @@
     .dot:nth-child(1){animation:bounce 1.2s ease-in-out 0s infinite}
     .dot:nth-child(2){animation:bounce 1.2s ease-in-out .2s infinite}
     .dot:nth-child(3){animation:bounce 1.2s ease-in-out .4s infinite}
-
-    /* ── INPUT AREA ── */
+    /* INPUT */
     #input-area{padding:10px 18px 18px;border-top:1px solid rgba(74,139,111,0.1);background:rgba(10,22,16,0.7);backdrop-filter:blur(16px);flex-shrink:0;z-index:10}
-
-    /* Aperçu fichiers joints */
-    #file-preview-bar{display:none;flex-wrap:wrap;gap:6px;padding:8px 4px 6px;margin-bottom:4px}
+    #file-preview-bar{display:none;flex-wrap:wrap;gap:6px;padding:6px 2px 8px}
     #file-preview-bar.has-files{display:flex}
-    .file-chip{display:flex;align-items:center;gap:6px;background:rgba(74,139,111,0.15);border:1px solid rgba(74,139,111,0.3);border-radius:8px;padding:5px 8px 5px 10px;font-size:11.5px;color:#a8c5b5;max-width:200px}
+    .file-chip{display:flex;align-items:center;gap:6px;background:rgba(74,139,111,0.15);border:1px solid rgba(74,139,111,0.3);border-radius:8px;padding:5px 8px;font-size:11.5px;color:#a8c5b5;max-width:220px}
     .file-chip-icon{font-size:14px;flex-shrink:0}
     .file-chip-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
-    .file-chip-size{font-size:10px;color:rgba(124,154,138,0.5);flex-shrink:0}
-    .file-chip-del{background:none;border:none;color:rgba(255,100,100,0.6);cursor:pointer;padding:0 0 0 4px;font-size:14px;line-height:1;flex-shrink:0;transition:color .15s}
+    .file-chip-size{font-size:10px;color:rgba(124,154,138,0.5);flex-shrink:0;margin-left:4px}
+    .file-chip-del{background:none;border:none;color:rgba(255,100,100,0.6);cursor:pointer;padding:0 0 0 4px;font-size:16px;line-height:1;flex-shrink:0}
     .file-chip-del:hover{color:#ff6464}
-    .file-chip-img{width:32px;height:32px;border-radius:5px;object-fit:cover;flex-shrink:0}
-
+    .file-chip-status{font-size:10px;color:#4ade80;flex-shrink:0}
     #ibox{display:flex;gap:8px;align-items:flex-end;background:rgba(255,255,255,0.05);border:1px solid rgba(74,139,111,0.2);border-radius:14px;padding:10px 12px;transition:all .2s}
     #ibox:focus-within{border-color:rgba(74,139,111,0.45);background:rgba(255,255,255,0.07);box-shadow:0 0 0 3px rgba(74,139,111,0.08)}
-
-    /* Bouton + */
-    #attach-btn{width:32px;height:32px;border-radius:8px;background:rgba(74,139,111,0.1);border:1px solid rgba(74,139,111,0.25);color:#7c9a8a;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;position:relative}
+    #attach-btn{width:32px;height:32px;border-radius:8px;background:rgba(74,139,111,0.1);border:1px solid rgba(74,139,111,0.25);color:#7c9a8a;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
     #attach-btn:hover{background:rgba(74,139,111,0.2);color:#e8f5e9;border-color:rgba(74,139,111,0.4)}
     #attach-btn svg{width:16px;height:16px}
     #file-input{display:none}
-
     #ta{flex:1;background:transparent;border:none;outline:none;color:#e8f5e9;font-size:13.5px;line-height:1.6;font-family:'Inter',sans-serif;resize:none;max-height:120px;min-height:22px;overflow-y:auto}
     #ta::placeholder{color:rgba(124,154,138,0.5)}
     #sbtn{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#1e5c32,#2d7a50);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;box-shadow:0 3px 10px rgba(30,92,50,0.4)}
@@ -119,23 +114,17 @@
     .input-footer{display:flex;align-items:center;justify-content:space-between;margin-top:7px;padding:0 2px}
     .input-hint{font-size:10px;color:rgba(124,154,138,0.35)}
     #char-count{font-size:10px;color:rgba(124,154,138,0.35)}
-
-    /* Fichiers dans les bulles */
-    .msg-file-attach{display:flex;align-items:center;gap:7px;background:rgba(74,139,111,0.1);border:1px solid rgba(74,139,111,0.2);border-radius:8px;padding:6px 10px;margin-top:6px;font-size:12px;color:#a8c5b5}
-    .msg-file-attach-icon{font-size:15px}
-    .bubble.usr .msg-file-attach{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.15);color:rgba(232,245,233,0.85)}
-    .bubble.usr .msg-file-img{margin-top:6px;max-width:200px;border-radius:8px;display:block}
-
+    .msg-file-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border-radius:6px;padding:4px 8px;font-size:11.5px;margin-top:5px;color:rgba(232,245,233,0.85)}
+    .msg-img-preview{margin-top:6px;max-width:200px;border-radius:8px;display:block}
     #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:40;backdrop-filter:blur(2px)}
     #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(26,74,46,0.95);border:1px solid rgba(74,139,111,0.3);color:#a8c5b5;font-size:12px;padding:8px 16px;border-radius:20px;opacity:0;transition:all .3s;z-index:200;pointer-events:none;white-space:nowrap}
     #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
     @media(max-width:640px){
       #menu-btn{display:flex}
       #sidebar{position:fixed;top:0;left:0;height:100%;transform:translateX(-100%)}
       #sidebar.open{transform:translateX(0)}
       #overlay.open{display:block}
-      .bubble{max-width:85%}
+      .bubble{max-width:88%}
       .bubble.img-bubble img{max-width:220px}
       #header{padding:10px 12px}
       #messages{padding:14px 12px 8px}
@@ -152,7 +141,6 @@
 </head>
 <body>
 <div id="app">
-
   <div id="sidebar">
     <div id="sidebar-header">
       <div class="brand">
@@ -182,9 +170,7 @@
       <div>Gratuit · Historique local</div>
     </div>
   </div>
-
   <div id="overlay" onclick="closeSidebar()"></div>
-
   <div id="main">
     <div id="header">
       <button id="menu-btn" onclick="toggleSidebar()">
@@ -238,18 +224,16 @@
     </div>
 
     <div id="input-area">
-      <!-- Barre aperçu fichiers -->
       <div id="file-preview-bar"></div>
-
       <div id="ibox">
-        <!-- Bouton + -->
-        <button id="attach-btn" onclick="document.getElementById('file-input').click()" title="Joindre un fichier">
+        <button id="attach-btn" title="Joindre un fichier" onclick="document.getElementById('file-input').click()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
         </button>
-        <input type="file" id="file-input" multiple accept=".txt,.md,.csv,.json,.js,.ts,.py,.html,.css,.xml,.pdf,.jpg,.jpeg,.png,.gif,.webp,.svg" onchange="handleFiles(this.files)"/>
-
+        <input type="file" id="file-input" multiple
+          accept=".txt,.md,.csv,.json,.js,.ts,.jsx,.tsx,.py,.html,.css,.xml,.yaml,.yml,.pdf,.jpg,.jpeg,.png,.gif,.webp,.svg"
+          onchange="handleFiles(this.files)"/>
         <textarea id="ta" rows="1" placeholder="Posez votre question ou demandez une image…"></textarea>
         <button id="sbtn" onclick="send()" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -267,9 +251,12 @@
 <div id="toast"></div>
 
 <script>
-const CONVS_KEY='ia_convs_v3', CUR_KEY='ia_cur_v3';
+// ── CONFIG PDF.js ──
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const CONVS_KEY='ia_convs_v4', CUR_KEY='ia_cur_v4';
 let convs={}, currentId=null, loading=false;
-let pendingFiles=[]; // {name, size, type, content (texte ou dataURL)}
+let pendingFiles=[]; // {name, size, type, text, isImage, dataUrl}
 
 const msgEl=document.getElementById('messages');
 const ta=document.getElementById('ta');
@@ -289,47 +276,103 @@ function load(){
   if(currentId&&convs[currentId]) loadConv(currentId);
 }
 function save(){
-  localStorage.setItem(CONVS_KEY,JSON.stringify(convs));
-  if(currentId) localStorage.setItem(CUR_KEY,currentId);
+  try{
+    localStorage.setItem(CONVS_KEY,JSON.stringify(convs));
+    if(currentId) localStorage.setItem(CUR_KEY,currentId);
+  }catch(e){console.warn('localStorage plein',e)}
 }
 
-// ── FICHIERS ──
-function fileIcon(type,name){
-  if(type.startsWith('image/')) return '🖼️';
-  if(type==='application/pdf'||name.endsWith('.pdf')) return '📄';
+// ── EXTRACTION FICHIERS ──
+function fileIcon(name,type){
+  if(type&&type.startsWith('image/')) return '🖼️';
+  if(name.endsWith('.pdf')) return '📄';
   if(name.match(/\.(js|ts|jsx|tsx)$/)) return '📜';
-  if(name.match(/\.(py)$/)) return '🐍';
+  if(name.endsWith('.py')) return '🐍';
   if(name.match(/\.(html|css)$/)) return '🌐';
-  if(name.match(/\.(json|csv|xml)$/)) return '📊';
+  if(name.match(/\.(json|csv|xml|yaml|yml)$/)) return '📊';
   return '📝';
 }
-
-function fmtSize(bytes){
-  if(bytes<1024) return bytes+'o';
-  if(bytes<1024*1024) return (bytes/1024).toFixed(0)+'Ko';
-  return (bytes/(1024*1024)).toFixed(1)+'Mo';
+function fmtSize(b){
+  if(b<1024) return b+'o';
+  if(b<1048576) return (b/1024).toFixed(0)+'Ko';
+  return (b/1048576).toFixed(1)+'Mo';
 }
 
-function handleFiles(fileList){
-  const MAX=5, MAX_SIZE=4*1024*1024; // max 5 fichiers, 4Mo chacun
-  Array.from(fileList).forEach(file=>{
-    if(pendingFiles.length>=MAX){toast('Maximum 5 fichiers à la fois');return}
-    if(file.size>MAX_SIZE){toast(`${file.name} trop lourd (max 4Mo)`);return}
+async function extractPdfText(file){
+  return new Promise((resolve)=>{
     const reader=new FileReader();
-    if(file.type.startsWith('image/')){
-      reader.onload=e=>{
-        pendingFiles.push({name:file.name,size:file.size,type:file.type,content:e.target.result,isImage:true});
-        renderFilePreview();updateSendBtn();
-      };
-      reader.readAsDataURL(file);
-    } else {
-      reader.onload=e=>{
-        pendingFiles.push({name:file.name,size:file.size,type:file.type,content:e.target.result,isImage:false});
-        renderFilePreview();updateSendBtn();
-      };
-      reader.readAsText(file,'utf-8');
-    }
+    reader.onload=async(e)=>{
+      try{
+        const pdf=await pdfjsLib.getDocument({data:e.target.result}).promise;
+        let text='';
+        for(let i=1;i<=Math.min(pdf.numPages,15);i++){
+          const page=await pdf.getPage(i);
+          const content=await page.getTextContent();
+          text+=content.items.map(s=>s.str).join(' ')+'\n';
+        }
+        resolve(text.trim()||'[PDF sans texte extractible]');
+      }catch(err){
+        resolve('[Erreur lecture PDF: '+err.message+']');
+      }
+    };
+    reader.onerror=()=>resolve('[Erreur lecture fichier]');
+    reader.readAsArrayBuffer(file);
   });
+}
+
+async function extractText(file){
+  return new Promise((resolve)=>{
+    const reader=new FileReader();
+    reader.onload=e=>resolve(e.target.result||'');
+    reader.onerror=()=>resolve('[Erreur lecture]');
+    reader.readAsText(file,'utf-8');
+  });
+}
+
+async function readImageAsDataUrl(file){
+  return new Promise((resolve)=>{
+    const reader=new FileReader();
+    reader.onload=e=>resolve(e.target.result);
+    reader.onerror=()=>resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFiles(fileList){
+  const MAX=5, MAX_SIZE=10*1024*1024;
+  for(const file of Array.from(fileList)){
+    if(pendingFiles.length>=MAX){toast('Maximum 5 fichiers');break}
+    if(file.size>MAX_SIZE){toast(file.name+' trop lourd (max 10Mo)');continue}
+
+    // Chip de chargement
+    const idx=pendingFiles.length;
+    pendingFiles.push({name:file.name,size:file.size,type:file.type,text:'',isImage:false,dataUrl:null,loading:true});
+    renderFilePreview();
+
+    let text='', isImage=false, dataUrl=null;
+    const isImg=file.type.startsWith('image/');
+    const isPdf=file.name.endsWith('.pdf')||file.type==='application/pdf';
+
+    if(isImg){
+      isImage=true;
+      dataUrl=await readImageAsDataUrl(file);
+      text=`[Image jointe: ${file.name}, taille: ${fmtSize(file.size)}. L'utilisateur a partagé cette image. Décris ce que tu ferais avec et réponds à sa question en te basant sur le contexte.]`;
+    } else if(isPdf){
+      if(!window.pdfjsLib){
+        text='[PDF joint: '+file.name+' - PDF.js non chargé, impossible d\'extraire le texte]';
+      } else {
+        text=await extractPdfText(file);
+        text=text.slice(0,6000);
+      }
+    } else {
+      text=await extractText(file);
+      text=text.slice(0,6000);
+    }
+
+    pendingFiles[idx]={name:file.name,size:file.size,type:file.type,text,isImage,dataUrl,loading:false};
+    renderFilePreview();
+    updateSendBtn();
+  }
   document.getElementById('file-input').value='';
 }
 
@@ -339,13 +382,15 @@ function renderFilePreview(){
   filePreviewBar.classList.add('has-files');
   pendingFiles.forEach((f,i)=>{
     const chip=document.createElement('div');chip.className='file-chip';
-    if(f.isImage){
-      chip.innerHTML=`<img src="${f.content}" class="file-chip-img" alt="${esc(f.name)}">
+    if(f.loading){
+      chip.innerHTML=`<span class="file-chip-icon">⏳</span><span class="file-chip-name">${esc(f.name)}</span><span class="file-chip-status">Lecture…</span>`;
+    } else if(f.isImage&&f.dataUrl){
+      chip.innerHTML=`<img src="${f.dataUrl}" style="width:28px;height:28px;border-radius:4px;object-fit:cover;flex-shrink:0">
         <span class="file-chip-name">${esc(f.name)}</span>
         <span class="file-chip-size">${fmtSize(f.size)}</span>
         <button class="file-chip-del" onclick="removeFile(${i})">×</button>`;
     } else {
-      chip.innerHTML=`<span class="file-chip-icon">${fileIcon(f.type,f.name)}</span>
+      chip.innerHTML=`<span class="file-chip-icon">${fileIcon(f.name,f.type)}</span>
         <span class="file-chip-name">${esc(f.name)}</span>
         <span class="file-chip-size">${fmtSize(f.size)}</span>
         <button class="file-chip-del" onclick="removeFile(${i})">×</button>`;
@@ -354,14 +399,8 @@ function renderFilePreview(){
   });
 }
 
-function removeFile(i){
-  pendingFiles.splice(i,1);
-  renderFilePreview();updateSendBtn();
-}
-
-function updateSendBtn(){
-  sb.disabled=(!ta.value.trim()&&!pendingFiles.length)||loading;
-}
+function removeFile(i){pendingFiles.splice(i,1);renderFilePreview();updateSendBtn()}
+function updateSendBtn(){sb.disabled=(!ta.value.trim()&&!pendingFiles.length)||loading||pendingFiles.some(f=>f.loading)}
 
 // ── SIDEBAR ──
 function renderSidebar(){
@@ -418,8 +457,7 @@ function fmtTime(ts){return new Date(ts).toLocaleTimeString('fr-FR',{hour:'2-dig
 // ── CONVERSATIONS ──
 function newChat(){
   currentId=null;pendingFiles=[];renderFilePreview();
-  msgEl.innerHTML='';
-  emptyState.style.display='flex';
+  msgEl.innerHTML='';emptyState.style.display='flex';
   chatTitle.textContent='Nouvelle conversation';
   localStorage.removeItem(CUR_KEY);
   renderSidebar();closeSidebar();ta.focus();
@@ -428,24 +466,20 @@ function newChat(){
 function loadConv(id){
   currentId=id;
   const c=convs[id];if(!c)return;
-  msgEl.innerHTML='';
-  emptyState.style.display='none';
+  msgEl.innerHTML='';emptyState.style.display='none';
   chatTitle.textContent=c.title;
   c.messages.forEach(m=>{
     if(m.type==='image') addMsgImageDOM(m.url,m.ts);
-    else addMsgDOM(m.role,m.content,m.ts,m.attachments||[]);
+    else addMsgDOM(m.role,m.displayContent||m.content,m.ts,m.chips||[]);
   });
   localStorage.setItem(CUR_KEY,id);
-  renderSidebar();
-  msgEl.scrollTop=msgEl.scrollHeight;
+  renderSidebar();msgEl.scrollTop=msgEl.scrollHeight;
 }
 
 function delConv(id,e){
-  e.stopPropagation();
-  delete convs[id];
+  e.stopPropagation();delete convs[id];
   if(currentId===id) newChat();
-  save();renderSidebar();
-  toast('Conversation supprimée');
+  save();renderSidebar();toast('Conversation supprimée');
 }
 
 function getOrCreate(firstMsg){
@@ -453,8 +487,7 @@ function getOrCreate(firstMsg){
     const id='c'+Date.now();
     const title=firstMsg.length>42?firstMsg.slice(0,42)+'…':firstMsg;
     convs[id]={id,title,messages:[],date:Date.now()};
-    currentId=id;
-    emptyState.style.display='none';
+    currentId=id;emptyState.style.display='none';
     chatTitle.textContent=title;
   }
   return convs[currentId];
@@ -473,7 +506,7 @@ function fmtMd(text){
   return text;
 }
 
-function addMsgDOM(role, content, ts, attachments){
+function addMsgDOM(role,content,ts,chips){
   const now=ts||Date.now();
   const row=document.createElement('div');row.className='row '+(role==='user'?'user':'assistant');
   if(role==='assistant'){
@@ -483,30 +516,26 @@ function addMsgDOM(role, content, ts, attachments){
   }
   const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;max-width:76%';
   const b=document.createElement('div');b.className='bubble '+(role==='user'?'usr':'ai');
-
   if(role==='assistant'){
     b.innerHTML=fmtMd(content);
   } else {
     if(content) b.appendChild(document.createTextNode(content));
-    // Affiche les pièces jointes dans la bulle utilisateur
-    (attachments||[]).forEach(att=>{
-      if(att.isImage){
+    // Affiche les chips de fichiers joints
+    (chips||[]).forEach(chip=>{
+      if(chip.isImage&&chip.dataUrl){
         const img=document.createElement('img');
-        img.src=att.dataUrl;img.className='bubble-img';
-        img.style.cssText='margin-top:6px;max-width:200px;border-radius:8px;display:block';
+        img.src=chip.dataUrl;img.className='msg-img-preview';img.alt=chip.name;
         b.appendChild(img);
       } else {
-        const d=document.createElement('div');d.className='msg-file-attach';
-        d.innerHTML=`<span class="msg-file-attach-icon">${fileIcon(att.type,att.name)}</span><span>${esc(att.name)}</span><span style="margin-left:auto;font-size:10px;opacity:.6">${fmtSize(att.size)}</span>`;
+        const d=document.createElement('div');d.className='msg-file-chip';
+        d.innerHTML=`${fileIcon(chip.name,chip.type)} ${esc(chip.name)} <span style="opacity:.6;font-size:10px;margin-left:4px">${fmtSize(chip.size)}</span>`;
         b.appendChild(d);
       }
     });
   }
-
   wrap.appendChild(b);
   const t=document.createElement('div');t.className='msg-time';t.textContent=fmtTime(now);
-  wrap.appendChild(t);
-  row.appendChild(wrap);
+  wrap.appendChild(t);row.appendChild(wrap);
   if(role==='user'){
     const a=document.createElement('div');a.className='av usr';a.textContent='👤';row.appendChild(a);
   }
@@ -524,8 +553,7 @@ function addMsgImageDOM(url,ts){
   const loadDiv=document.createElement('div');loadDiv.className='img-loading';
   loadDiv.innerHTML='<div class="img-loading-spinner"></div><span>Génération en cours…</span>';
   b.appendChild(loadDiv);
-  const img=document.createElement('img');
-  img.style.display='none';img.alt='Image générée';
+  const img=document.createElement('img');img.style.display='none';img.alt='Image générée';
   img.onload=()=>{loadDiv.remove();img.style.display='block';msgEl.scrollTop=msgEl.scrollHeight};
   img.onerror=()=>{loadDiv.innerHTML='❌ Échec du chargement'};
   img.src=url;b.appendChild(img);
@@ -535,22 +563,21 @@ function addMsgImageDOM(url,ts){
   msgEl.appendChild(row);msgEl.scrollTop=msgEl.scrollHeight;
 }
 
-function addMsg(role, content, attachments){
+function addMsg(role,displayContent,apiContent,chips){
   const ts=Date.now();
-  addMsgDOM(role,content,ts,attachments||[]);
+  addMsgDOM(role,displayContent,ts,chips||[]);
   const c=convs[currentId];
   if(c){
-    // On stocke les pièces jointes en métadonnée (sans le contenu base64 pour les images, trop lourd pour localStorage)
-    const lightAtts=(attachments||[]).map(a=>({name:a.name,size:a.size,type:a.type,isImage:a.isImage,dataUrl:a.isImage?a.dataUrl:null}));
-    c.messages.push({role,content,ts,attachments:lightAtts});
-    c.date=ts;save();renderSidebar();
+    // On stocke displayContent pour l'affichage et apiContent pour l'API
+    const msg={role,content:apiContent,displayContent,ts,chips:(chips||[]).map(ch=>({name:ch.name,size:ch.size,type:ch.type,isImage:ch.isImage,dataUrl:ch.isImage?ch.dataUrl:null}))};
+    c.messages.push(msg);c.date=ts;save();renderSidebar();
   }
 }
 
 function addMsgImage(url){
   const ts=Date.now();addMsgImageDOM(url,ts);
   const c=convs[currentId];
-  if(c){c.messages.push({type:'image',role:'assistant',url,content:'[Image générée]',ts});c.date=ts;save();renderSidebar()}
+  if(c){c.messages.push({type:'image',role:'assistant',url,content:'[Image générée]',displayContent:'[Image générée]',ts});c.date=ts;save();renderSidebar()}
 }
 
 function addTyping(){
@@ -568,8 +595,7 @@ function rmTyping(){const e=document.getElementById('typing');if(e)e.remove()}
 ta.addEventListener('input',()=>{
   ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,120)+'px';
   updateSendBtn();
-  const l=ta.value.length;
-  charCount.textContent=l>0?`${l} car.`:'';
+  charCount.textContent=ta.value.length>0?ta.value.length+' car.':'';
 });
 ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!sb.disabled)send()}});
 function fill(t){ta.value=t;ta.dispatchEvent(new Event('input'));ta.focus()}
@@ -587,28 +613,12 @@ function buildImagePrompt(text){
     .trim()||text;
 }
 
-// ── CONSTRUCTION DU CONTENU AVEC FICHIERS ──
-function buildMessageContent(text, files){
-  // On injecte le contenu des fichiers dans le message texte envoyé à l'API
-  let parts=[];
-  if(text) parts.push(text);
-  files.forEach(f=>{
-    if(f.isImage){
-      parts.push(`[Image jointe : ${f.name}]\n(L'image est une image fournie par l'utilisateur)`);
-    } else {
-      // Tronque si trop long (max ~3000 chars par fichier)
-      const c=f.content.length>3000?f.content.slice(0,3000)+'…[tronqué]':f.content;
-      parts.push(`[Fichier joint : ${f.name}]\n\`\`\`\n${c}\n\`\`\``);
-    }
-  });
-  return parts.join('\n\n');
-}
-
 // ── SEND ──
 async function send(){
   const text=ta.value.trim();
   const files=[...pendingFiles];
-  if(!text&&!files.length||loading) return;
+  if((!text&&!files.length)||loading) return;
+  if(files.some(f=>f.loading)){toast('Lecture des fichiers en cours…');return}
 
   const firstMsg=text||(files[0]?.name||'Fichier');
   const conv=getOrCreate(firstMsg);
@@ -617,11 +627,20 @@ async function send(){
   pendingFiles=[];renderFilePreview();
   sb.disabled=true;loading=true;charCount.textContent='';
 
-  // Affiche le message utilisateur avec pièces jointes
-  addMsg('user', text, files.map(f=>({name:f.name,size:f.size,type:f.type,isImage:f.isImage,dataUrl:f.isImage?f.content:null})));
+  // Chips pour l'affichage
+  const chips=files.map(f=>({name:f.name,size:f.size,type:f.type,isImage:f.isImage,dataUrl:f.dataUrl}));
 
-  // Génération d'image ?
-  if(!files.length && isImageRequest(text)){
+  // Contenu API = texte + contenu des fichiers injecté
+  const fileParts=files.map(f=>{
+    if(f.isImage) return `[Image jointe: ${f.name} (${fmtSize(f.size)}). Réponds à la question de l'utilisateur en tenant compte de cette image jointe.]`;
+    const truncated=f.text.length>5000?f.text.slice(0,5000)+'\n…[tronqué]':f.text;
+    return `=== Fichier: ${f.name} ===\n${truncated}\n=== Fin du fichier ===`;
+  });
+  const apiContent=[...fileParts, text].filter(Boolean).join('\n\n');
+
+  // Génération image ? (seulement sans fichiers joints)
+  if(!files.length&&isImageRequest(text)){
+    addMsg('user',text,text,[]);
     addTyping();
     await new Promise(r=>setTimeout(r,300));
     rmTyping();
@@ -633,33 +652,30 @@ async function send(){
     return;
   }
 
+  // Affiche le message utilisateur
+  addMsg('user', text, apiContent, chips);
+
   addTyping();
   try{
-    // Construit les messages pour l'API (contenu fichiers injecté dans le texte)
-    const apiMessages=conv.messages.slice(-20).map(m=>{
-      // Reconstruit le contenu avec les fichiers stockés si nécessaire
-      // (les messages précédents ont déjà leur contenu complet)
-      return {role:m.role, content:m.content};
-    });
-
-    // Le dernier message utilisateur doit inclure le contenu des fichiers
-    const fullContent=buildMessageContent(text,files);
-    // Remplace le dernier message user (qu'on vient d'ajouter) par la version avec fichiers
-    if(apiMessages.length>0 && apiMessages[apiMessages.length-1].role==='user'){
-      apiMessages[apiMessages.length-1].content=fullContent;
-    }
+    // Construit les messages API : historique (avec apiContent) + message actuel déjà ajouté
+    const apiMessages=conv.messages.slice(-20).map(m=>({
+      role:m.role,
+      content:String(m.content||'')
+    }));
 
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({messages:apiMessages})
     });
-    const d=await r.json();
+    const raw=await r.text();
+    let d;
+    try{d=JSON.parse(raw)}catch(err){throw new Error('Réponse serveur invalide: '+raw.slice(0,100))}
     if(!r.ok) throw new Error(d?.error?.message||'Erreur '+r.status);
     const reply=d.choices?.[0]?.message?.content||'Aucune réponse.';
-    rmTyping();addMsg('assistant',reply);
+    rmTyping();addMsg('assistant',reply,reply,[]);
   }catch(e){
-    rmTyping();addMsg('assistant','❌ '+e.message);
+    rmTyping();addMsg('assistant','❌ '+e.message,'❌ '+e.message,[]);
   }finally{
     loading=false;updateSendBtn();
   }
