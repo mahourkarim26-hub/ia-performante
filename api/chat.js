@@ -1,93 +1,69 @@
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).end();
+async function send(){
+  const text=ta.value.trim();
+  const files=[...pendingFiles];
+  if(!text&&!files.length||loading) return;
 
-  const SYSTEM = `Tu es un assistant IA de très haut niveau, expert généraliste et spécialiste à la demande. Tu es rigoureux, honnête, précis, et tu t'adaptes au niveau et au contexte de chaque utilisateur. Tu n'es jamais condescendant ni vague.
+  const firstMsg=text||(files[0]?.name||'Fichier');
+  const conv=getOrCreate(firstMsg);
 
-## 1. PRÉCISION ABSOLUE
-- Ne génère JAMAIS d'information inventée. Si tu n'es pas sûr : "Je ne suis pas certain, mais voici ce que je sais : ..."
-- Distingue : faits établis / opinions / hypothèses / déductions.
-- En cas d'ambiguïté, pose des questions AVANT de répondre.
+  ta.value='';ta.style.height='auto';
+  pendingFiles=[];renderFilePreview();
+  sb.disabled=true;loading=true;charCount.textContent='';
 
-## 2. RAISONNEMENT STRUCTURÉ (CHAIN OF THOUGHT)
-- Pour toute tâche complexe, raisonne étape par étape.
-- Montre ton processus de réflexion.
+  // Affiche le message utilisateur avec pièces jointes
+  const displayAtts=files.map(f=>({name:f.name,size:f.size,type:f.type,isImage:f.isImage,dataUrl:f.isImage?f.content:null}));
+  addMsg('user', text, displayAtts);
 
-## 3. ADAPTATION AU CONTEXTE
-- Adapte ton niveau de langage à l'utilisateur.
-- Utilise des exemples concrets et des analogies.
-- Sois bref si demandé, détaillé sinon.
+  // Génération d'image ?
+  if(!files.length && isImageRequest(text)){
+    addTyping();
+    await new Promise(r=>setTimeout(r,300));
+    rmTyping();
+    const prompt=encodeURIComponent(buildImagePrompt(text));
+    const seed=Math.floor(Math.random()*99999);
+    const url=`https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&nologo=true&seed=${seed}`;
+    addMsgImage(url);
+    loading=false;updateSendBtn();
+    return;
+  }
 
-## 4. FORMAT ET STRUCTURE
-- Structure tes réponses clairement avec titres et listes.
-- Utilise la mise en forme markdown pour la lisibilité.
-
-## 5. HONNÊTETÉ ET LIMITES
-- Reconnais tes limites honnêtement.
-- Dis "Je ne sais pas" plutôt que d'inventer.
-
-## 6. PROACTIVITÉ INTELLIGENTE
-- Anticipe les questions suivantes, propose des pistes.
-- Corrige poliment les erreurs dans les questions.
-- Offre des perspectives alternatives.
-
-## 7. MÉMOIRE CONTEXTUELLE
-- Utilise le contexte de toute la conversation.
-- Référence les messages précédents si pertinent.
-
-## 8. CRÉATIVITÉ ET EXPERTISE
-- Créatif : qualité professionnelle, original, innovant.
-- Technique : rigoureux, complet, actualisé.
-
-## 9. STYLE DE COMMUNICATION
-- Direct et authentique. Pas de "Bien sûr !", "Absolument !".
-- Ton professionnel mais chaleureux et accessible.
-
-## 10. SÉCURITÉ ET ÉTHIQUE
-- Refuse calmement toute demande nuisible ou illégale.
-- Explique pourquoi si pertinent.
-- Propose une alternative constructive.`;
-
-  try {
-    if (!req.body || !Array.isArray(req.body.messages)) {
-      return res.status(400).json({ error: { message: 'Messages invalides' } });
-    }
-
-    const messages = req.body.messages.slice(-20).map(m => ({
-      role: m.role,
-      content: m.content
+  addTyping();
+  try{
+    // Historique des messages précédents (sans le dernier qu'on vient d'ajouter)
+    const history=conv.messages.slice(0,-1).slice(-18).map(m=>({
+      role:m.role,
+      content:m.content||''
     }));
 
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: { message: 'Clé API manquante' } });
-    }
+    // Message actuel avec le vrai contenu des fichiers injecté
+    const fileContents=files.map(f=>{
+      if(f.isImage){
+        return `[Image jointe : ${f.name} - l'utilisateur a joint une image, décris ce que tu ferais avec si tu pouvais la voir]`;
+      } else {
+        const c=f.content.length>4000?f.content.slice(0,4000)+'…[tronqué]':f.content;
+        return `[Fichier joint : ${f.name}]\n\`\`\`\n${c}\n\`\`\``;
+      }
+    }).join('\n\n');
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'system', content: SYSTEM }, ...messages],
-        temperature: 0.7,
-        max_tokens: 2048
-      })
+    const fullContent=[fileContents, text].filter(Boolean).join('\n\n');
+
+    const apiMessages=[
+      ...history,
+      {role:'user', content:fullContent}
+    ];
+
+    const r=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:apiMessages})
     });
-
-    const data = await response.json();
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: { message: data?.error?.message || 'Erreur API Groq' }
-      });
-    }
-    return res.status(200).json(data);
-  } catch (e) {
-    return res.status(500).json({ error: { message: e.message } });
+    const d=await r.json();
+    if(!r.ok) throw new Error(d?.error?.message||'Erreur '+r.status);
+    const reply=d.choices?.[0]?.message?.content||'Aucune réponse.';
+    rmTyping();addMsg('assistant',reply);
+  }catch(e){
+    rmTyping();addMsg('assistant','❌ '+e.message);
+  }finally{
+    loading=false;updateSendBtn();
   }
 }
