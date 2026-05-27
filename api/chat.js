@@ -54,14 +54,24 @@ export default async function handler(req, res) {
       content: Array.isArray(m.content) ? m.content : String(m.content || '')
     }));
 
+    const hasImages = messages.some(m =>
+      Array.isArray(m.content) && m.content.some(c => c.type === 'image_url')
+    );
+
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: { message: 'Clé API manquante' } });
     }
 
-    const model = req.body.model || 'llama-3.3-70b-versatile';
+    const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+    const requestedModel = req.body.model || 'llama-3.3-70b-versatile';
+    const model = hasImages ? VISION_MODEL : requestedModel;
     const temperature = req.body.temperature ?? 0.7;
     const stream = req.body.stream === true;
+
+    const finalMessages = hasImages
+      ? [{ role: 'user', content: `[Système: ${SYSTEM}]\n\n[Message:]` }, ...messages]
+      : [{ role: 'system', content: SYSTEM }, ...messages];
 
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -71,7 +81,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: 'system', content: SYSTEM }, ...messages],
+        messages: finalMessages,
         temperature,
         max_tokens: 2048,
         stream
@@ -88,7 +98,6 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    // ── STREAMING : lecture manuelle chunk par chunk ──
     if (!groqRes.ok) {
       const err = await groqRes.json().catch(() => ({}));
       return res.status(groqRes.status).json({
@@ -103,13 +112,11 @@ export default async function handler(req, res) {
 
     const reader = groqRes.body.getReader();
     const decoder = new TextDecoder();
-
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        res.write(chunk);
+        res.write(decoder.decode(value, { stream: true }));
       }
     } catch (e) {
       // client déconnecté
@@ -127,7 +134,7 @@ export default async function handler(req, res) {
 
 export const config = {
   api: {
-    bodyParser: true,
+    bodyParser: { sizeLimit: '20mb' },
     responseLimit: false,
   },
 };
