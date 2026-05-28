@@ -1,5 +1,3 @@
-bash
-cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
 <!DOCTYPE html>
 <html lang="fr" data-theme="dark">
 <head>
@@ -15,18 +13,18 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
       --bg:#080f0a;--bg2:#0b1610;--bg3:#0d1a12;--bg4:#0f1f15;
       --surface:rgba(255,255,255,0.04);--surface2:rgba(255,255,255,0.07);
       --border:rgba(74,222,128,0.12);--border2:rgba(74,222,128,0.25);
-      --accent:#22c55e;--accent2:#16a34a;--accent3:#4ade80;--accent4:#bbf7d0;
+      --accent:#22c55e;--accent2:#16a34a;--accent3:#4ade80;
       --text:#e2f5e9;--text2:#86efac;--text3:#4ade80;--text4:rgba(74,222,128,0.3);
       --bubble-ai:#0f1f15;--bubble-ai-text:#e2f5e9;--bubble-ai-border:rgba(74,222,128,0.2);
       --bubble-usr-from:#14532d;--bubble-usr-to:#166534;
       --shadow:rgba(0,0,0,0.5);--glow:rgba(74,222,128,0.15);
-      --sidebar-bg:rgba(8,15,10,0.95);
+      --sidebar-bg:rgba(8,15,10,0.97);
     }
     :root[data-theme="light"]{
       --bg:#f0fdf4;--bg2:#dcfce7;--bg3:#bbf7d0;--bg4:#f7fef9;
       --surface:rgba(0,0,0,0.04);--surface2:rgba(0,0,0,0.07);
       --border:rgba(22,163,74,0.2);--border2:rgba(22,163,74,0.4);
-      --accent:#16a34a;--accent2:#15803d;--accent3:#166534;--accent4:#14532d;
+      --accent:#16a34a;--accent2:#15803d;--accent3:#166534;
       --text:#052e16;--text2:#166534;--text3:#15803d;--text4:rgba(22,163,74,0.4);
       --bubble-ai:#ffffff;--bubble-ai-text:#052e16;--bubble-ai-border:rgba(22,163,74,0.2);
       --bubble-usr-from:#15803d;--bubble-usr-to:#16a34a;
@@ -37,44 +35,20 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     html,body{height:100%;font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;transition:background .3s,color .3s}
     #app{display:flex;height:100vh}
 
-    /* ── SIDEBAR ── */
-    #sidebar{
-      width:260px;flex-shrink:0;
-      background:var(--sidebar-bg);
-      border-right:1px solid var(--border);
-      display:flex;flex-direction:column;
-      transition:transform .3s cubic-bezier(.4,0,.2,1);
-      z-index:50;position:relative;
-      backdrop-filter:blur(20px);
-    }
+    /* SIDEBAR */
+    #sidebar{width:260px;flex-shrink:0;background:var(--sidebar-bg);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:50;position:relative;backdrop-filter:blur(20px)}
     #sidebar-header{padding:14px;border-bottom:1px solid var(--border)}
     .brand{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-    .brand-logo{
-      width:32px;height:32px;flex-shrink:0;
-      background:linear-gradient(135deg,var(--accent2),var(--accent3));
-      border-radius:8px;display:flex;align-items:center;justify-content:center;
-      box-shadow:0 0 16px var(--glow);position:relative;overflow:hidden;
-    }
+    .brand-logo{width:32px;height:32px;flex-shrink:0;background:linear-gradient(135deg,var(--accent2),var(--accent3));border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px var(--glow);position:relative;overflow:hidden}
     .brand-logo::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,0.15));border-radius:8px}
     .brand-logo svg{width:16px;height:16px;position:relative;z-index:1}
     .brand-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--text);letter-spacing:-.3px}
     .brand-tag{font-size:8.5px;color:var(--text4);margin-top:1px;font-family:'JetBrains Mono',monospace}
-    #new-chat-btn{
-      width:100%;padding:8px 11px;
-      background:linear-gradient(135deg,var(--accent2),var(--accent));
-      border:none;border-radius:8px;
-      color:#fff;font-size:11.5px;font-family:'Space Grotesk',sans-serif;font-weight:600;
-      cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .2s;
-      box-shadow:0 2px 12px rgba(34,197,94,0.3);
-    }
+    #new-chat-btn{width:100%;padding:8px 11px;background:linear-gradient(135deg,var(--accent2),var(--accent));border:none;border-radius:8px;color:#fff;font-size:11.5px;font-family:'Space Grotesk',sans-serif;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .2s;box-shadow:0 2px 12px rgba(34,197,94,0.3)}
     #new-chat-btn:hover{transform:translateY(-1px);box-shadow:0 4px 18px rgba(34,197,94,0.4)}
     #new-chat-btn svg{width:12px;height:12px;flex-shrink:0}
     #search-wrap{padding:7px 14px;border-bottom:1px solid var(--border)}
-    #search-input{
-      width:100%;background:var(--surface);border:1px solid var(--border);
-      border-radius:7px;padding:6px 10px;color:var(--text);font-size:11.5px;
-      font-family:'Space Grotesk',sans-serif;outline:none;transition:border-color .2s;
-    }
+    #search-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text);font-size:11.5px;font-family:'Space Grotesk',sans-serif;outline:none;transition:border-color .2s}
     #search-input::placeholder{color:var(--text4)}
     #search-input:focus{border-color:var(--border2);box-shadow:0 0 0 3px var(--glow)}
     #sidebar-list{flex:1;overflow-y:auto;padding:5px}
@@ -95,28 +69,17 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     .conv-action-btn.del:hover{color:#f87171}
     #sidebar-footer{padding:10px 14px;border-top:1px solid var(--border);font-size:9.5px;color:var(--text4)}
     .footer-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
-    .status-dot{width:5px;height:5px;border-radius:50%;background:var(--accent3);flex-shrink:0;box-shadow:0 0 6px var(--accent3);animation:pulse 2s ease-in-out infinite}
+    .status-dot{width:5px;height:5px;border-radius:50%;background:var(--accent3);flex-shrink:0;box-shadow:0 0 6px var(--accent3);animation:statusPulse 2s ease-in-out infinite}
     .footer-btns{display:flex;gap:5px}
     .footer-btn{flex:1;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text3);font-size:9.5px;cursor:pointer;text-align:center;transition:all .2s;font-family:'Space Grotesk',sans-serif}
     .footer-btn:hover{background:var(--border);color:var(--text)}
 
-    /* ── MAIN ── */
+    /* MAIN */
     #main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg);position:relative;overflow:hidden}
-    #main::before{
-      content:'';position:absolute;inset:0;
-      background:
-        radial-gradient(ellipse 50% 40% at 80% 10%,rgba(74,222,128,0.04) 0%,transparent 60%),
-        radial-gradient(ellipse 40% 50% at 10% 80%,rgba(34,197,94,0.05) 0%,transparent 60%);
-      pointer-events:none;z-index:0;
-    }
+    #main::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 40% at 80% 10%,rgba(74,222,128,0.04) 0%,transparent 60%),radial-gradient(ellipse 40% 50% at 10% 80%,rgba(34,197,94,0.05) 0%,transparent 60%);pointer-events:none;z-index:0}
 
-    /* ── HEADER ── */
-    #header{
-      display:flex;align-items:center;gap:8px;padding:9px 14px;
-      border-bottom:1px solid var(--border);
-      background:rgba(8,15,10,0.8);backdrop-filter:blur(20px);
-      flex-shrink:0;z-index:10;
-    }
+    /* HEADER */
+    #header{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border);background:rgba(8,15,10,0.8);backdrop-filter:blur(20px);flex-shrink:0;z-index:10}
     [data-theme="light"] #header{background:rgba(240,253,244,0.85)}
     #menu-btn{display:none;background:none;border:none;color:var(--text3);cursor:pointer;padding:5px;border-radius:6px}
     .header-logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent2),var(--accent3));display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 12px var(--glow)}
@@ -125,11 +88,7 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     #chat-title:hover{color:var(--accent3)}
     .header-sub{font-size:9px;color:var(--text4);font-family:'JetBrains Mono',monospace}
     .header-right{margin-left:auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-    #model-select{
-      background:var(--surface);border:1px solid var(--border);border-radius:7px;
-      padding:4px 7px;color:var(--text2);font-size:10.5px;font-family:'Space Grotesk',sans-serif;
-      cursor:pointer;outline:none;
-    }
+    #model-select{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:4px 7px;color:var(--text2);font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;outline:none}
     #model-select:hover{border-color:var(--border2)}
     .temp-wrap{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:4px 8px}
     .temp-label{font-size:9.5px;color:var(--text3);white-space:nowrap;font-family:'JetBrains Mono',monospace}
@@ -164,70 +123,41 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     .search-highlight{background:rgba(74,222,128,0.25);border-radius:2px;padding:0 1px}
     .search-highlight.current{background:rgba(74,222,128,0.5)}
 
-    /* ── IMAGE GENERATION PANEL ── */
-    #img-panel{
-      display:none;flex-direction:column;gap:10px;
-      padding:10px 14px;border-bottom:1px solid var(--border);
-      background:rgba(8,15,10,0.5);backdrop-filter:blur(10px);
-      flex-shrink:0;z-index:9;
-    }
+    /* IMAGE PANEL */
+    #img-panel{display:none;flex-direction:column;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(8,15,10,0.5);backdrop-filter:blur(10px);flex-shrink:0;z-index:9}
     #img-panel.open{display:flex}
     .img-panel-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--accent3);display:flex;align-items:center;gap:6px}
     .img-panel-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
     .img-panel-label{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;white-space:nowrap}
     .img-panel-select{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--text2);font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;outline:none}
     .img-panel-select:hover{border-color:var(--border2)}
-    #img-prompt-input{
-      flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;
-      padding:5px 10px;color:var(--text);font-size:11.5px;font-family:'Space Grotesk',sans-serif;
-      outline:none;min-width:0;
-    }
+    #img-prompt-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--text);font-size:11.5px;font-family:'Space Grotesk',sans-serif;outline:none;min-width:0}
     #img-prompt-input:focus{border-color:var(--border2)}
     #img-prompt-input::placeholder{color:var(--text4)}
-    #img-generate-btn{
-      padding:5px 14px;background:linear-gradient(135deg,var(--accent2),var(--accent));
-      border:none;border-radius:7px;color:#fff;font-size:11px;font-family:'Space Grotesk',sans-serif;
-      font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;
-      box-shadow:0 2px 10px rgba(34,197,94,0.3);
-    }
+    #img-generate-btn{padding:5px 14px;background:linear-gradient(135deg,var(--accent2),var(--accent));border:none;border-radius:7px;color:#fff;font-size:11px;font-family:'Space Grotesk',sans-serif;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;box-shadow:0 2px 10px rgba(34,197,94,0.3)}
     #img-generate-btn:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(34,197,94,0.4)}
     #img-generate-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
     .img-quick-btns{display:flex;gap:5px;flex-wrap:wrap}
     .img-quick-btn{padding:3px 9px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text3);font-size:10px;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:all .15s}
     .img-quick-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
 
-    /* ── MESSAGES ── */
+    /* MESSAGES */
     #messages-wrap{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
     #messages{flex:1;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;z-index:1;scroll-behavior:smooth}
     #messages::-webkit-scrollbar{width:3px}
     #messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-    #scroll-btn{
-      position:absolute;bottom:14px;right:14px;width:32px;height:32px;border-radius:50%;
-      background:linear-gradient(135deg,var(--accent2),var(--accent3));
-      border:1px solid var(--border2);color:#fff;cursor:pointer;
-      display:none;align-items:center;justify-content:center;font-size:14px;z-index:20;
-      box-shadow:0 4px 16px rgba(34,197,94,0.4);transition:all .2s;
-    }
+    #scroll-btn{position:absolute;bottom:14px;right:14px;width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent3));border:1px solid var(--border2);color:#fff;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:14px;z-index:20;box-shadow:0 4px 16px rgba(34,197,94,0.4);transition:all .2s}
     #scroll-btn:hover{transform:scale(1.1)}
     #scroll-btn.visible{display:flex}
 
     /* EMPTY */
     #empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;padding:20px}
-    .es-logo-wrap{
-      width:64px;height:64px;border-radius:18px;
-      background:linear-gradient(135deg,var(--accent2),var(--accent3));
-      display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
-      box-shadow:0 0 40px rgba(74,222,128,0.25);
-    }
+    .es-logo-wrap{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,var(--accent2),var(--accent3));display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 0 40px rgba(74,222,128,0.25)}
     .es-logo-wrap svg{width:32px;height:32px}
     .es-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:5px;color:var(--text);letter-spacing:-.5px}
     .es-sub{font-size:12px;color:var(--text3);margin-bottom:24px;line-height:1.6;font-family:'JetBrains Mono',monospace}
     #sugg-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:440px;width:100%}
-    .sug{
-      background:var(--surface);border:1px solid var(--border);border-radius:10px;
-      padding:9px 11px;font-size:11px;color:var(--text2);cursor:pointer;
-      font-family:'Space Grotesk',sans-serif;transition:all .2s;text-align:left;line-height:1.45;
-    }
+    .sug{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 11px;font-size:11px;color:var(--text2);cursor:pointer;font-family:'Space Grotesk',sans-serif;transition:all .2s;text-align:left;line-height:1.45}
     .sug:hover{background:var(--surface2);color:var(--text);border-color:var(--border2);transform:translateY(-1px);box-shadow:0 4px 12px var(--shadow)}
     .sug-icon{font-size:16px;margin-bottom:4px;display:block}
 
@@ -280,8 +210,6 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     .msg-file-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.1);border-radius:5px;padding:3px 7px;font-size:10.5px;margin-top:4px;color:rgba(220,252,231,0.85)}
     .msg-img-preview{margin-top:5px;max-width:200px;border-radius:8px;display:block;cursor:zoom-in}
     .vision-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.25);border-radius:5px;padding:2px 7px;font-size:9px;color:var(--accent3);margin-top:4px;font-family:'JetBrains Mono',monospace}
-
-    /* Generated image actions */
     .img-actions{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
     .img-action-btn{padding:4px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text3);font-size:10px;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:all .2s}
     .img-action-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
@@ -294,7 +222,7 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     #lightbox-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;cursor:pointer;padding:7px 14px;font-size:13px;font-family:'Space Grotesk',sans-serif;transition:all .2s}
     #lightbox-close:hover{background:rgba(255,255,255,0.2)}
 
-    /* ── INPUT ── */
+    /* INPUT */
     #input-area{padding:7px 14px 14px;border-top:1px solid var(--border);background:rgba(8,15,10,0.7);backdrop-filter:blur(20px);flex-shrink:0;z-index:10}
     [data-theme="light"] #input-area{background:rgba(240,253,244,0.85)}
     #file-preview-bar{display:none;flex-wrap:wrap;gap:5px;padding:5px 2px 7px}
@@ -307,11 +235,10 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     .file-chip-del:hover{color:#f87171}
     #ibox{display:flex;gap:6px;align-items:flex-end;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 10px;transition:all .2s}
     #ibox:focus-within{border-color:var(--border2);box-shadow:0 0 0 3px var(--glow)}
-    #attach-btn{width:28px;height:28px;border-radius:7px;background:rgba(74,222,128,0.07);border:1px solid var(--border);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
-    #attach-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+    #attach-btn,#img-toggle-btn{width:28px;height:28px;border-radius:7px;background:rgba(74,222,128,0.07);border:1px solid var(--border);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+    #attach-btn:hover,#img-toggle-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
     #attach-btn svg{width:14px;height:14px}
-    #img-toggle-btn{width:28px;height:28px;border-radius:7px;background:rgba(74,222,128,0.07);border:1px solid var(--border);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;font-size:14px}
-    #img-toggle-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+    #img-toggle-btn{font-size:14px}
     #img-toggle-btn.active{background:rgba(74,222,128,0.12);border-color:var(--border2);color:var(--accent3)}
     #file-input{display:none}
     #ta{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12.5px;line-height:1.6;font-family:'Space Grotesk',sans-serif;resize:none;max-height:120px;min-height:20px;overflow-y:auto}
@@ -363,6 +290,9 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     .confirm-cancel{padding:6px 16px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text3);font-size:11.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer}
     .confirm-cancel:hover{background:var(--surface2);color:var(--text)}
 
+    /* WORD COUNT BADGE - nouveau */
+    .wc-badge{display:inline-block;background:rgba(74,222,128,0.08);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:8.5px;color:var(--text4);font-family:'JetBrains Mono',monospace;margin-left:6px;vertical-align:middle}
+
     @media(max-width:640px){
       #menu-btn{display:flex!important}
       #sidebar{position:fixed;top:0;left:0;height:100%;transform:translateX(-100%)}
@@ -378,10 +308,10 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     }
     @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
     @keyframes bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
-    @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 6px var(--accent3)}50%{opacity:.6;box-shadow:0 0 12px var(--accent3)}}
+    @keyframes statusPulse{0%,100%{box-shadow:0 0 6px var(--accent3)}50%{box-shadow:0 0 12px var(--accent3)}}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @keyframes shimmer{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}
-    .pulse-anim{animation:pulse 2s ease-in-out infinite}
+    @keyframes shimmer{0%,100%{opacity:.4}50%{opacity:1}}
+    .pulse-anim{animation:statusPulse 2s ease-in-out infinite}
   </style>
 </head>
 <body>
@@ -440,7 +370,7 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
       <div style="min-width:0">
         <div id="chat-title" onclick="startRename()" title="Cliquer pour renommer">Nouvelle conversation</div>
         <input type="text" id="rename-input" onblur="finishRename()" onkeydown="if(event.key==='Enter')finishRename();if(event.key==='Escape')cancelRename()"/>
-        <div class="header-sub">vision · streaming · image gen · pdf</div>
+        <div class="header-sub">vision · streaming · img gen · pdf · multi-modèles</div>
       </div>
       <div class="header-right">
         <div id="token-display">0 tok</div>
@@ -466,7 +396,6 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
       </div>
     </div>
 
-    <!-- Message search -->
     <div id="msg-search-bar">
       <input type="text" id="msg-search-input" placeholder="Rechercher dans la conversation…" oninput="doMsgSearch()"/>
       <span id="msg-search-count"></span>
@@ -475,14 +404,12 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
       <button class="msg-search-btn" onclick="closeMsgSearch()">×</button>
     </div>
 
-    <!-- Ctx bar -->
     <div id="ctx-bar" class="hidden">
       <span id="ctx-label">0/20</span>
       <div id="ctx-progress"><div id="ctx-fill"></div></div>
       <span id="ctx-warn"></span>
     </div>
 
-    <!-- IMAGE GENERATION PANEL -->
     <div id="img-panel">
       <div class="img-panel-title">🎨 Générateur d'images</div>
       <div class="img-panel-row">
@@ -503,10 +430,10 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
         <span class="img-panel-label">Taille</span>
         <select class="img-panel-select" id="img-size">
           <option value="512x512">512×512</option>
-          <option value="768x512">768×512 (paysage)</option>
-          <option value="512x768">512×768 (portrait)</option>
-          <option value="1024x576">1024×576 (cinéma)</option>
-          <option value="1024x1024">1024×1024 (HD)</option>
+          <option value="768x512">768×512 paysage</option>
+          <option value="512x768">512×768 portrait</option>
+          <option value="1024x576">1024×576 cinéma</option>
+          <option value="1024x1024">1024×1024 HD</option>
         </select>
         <span class="img-panel-label">Qualité</span>
         <select class="img-panel-select" id="img-enhance">
@@ -518,16 +445,16 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
       <div class="img-panel-row">
         <input type="text" id="img-prompt-input" placeholder="Décris l'image que tu veux générer…"/>
         <button id="img-generate-btn" onclick="generateImageFromPanel()">✨ Générer</button>
-        <button class="msg-search-btn" onclick="toggleImgPanel()" title="Fermer">×</button>
+        <button class="msg-search-btn" onclick="toggleImgPanel()">×</button>
       </div>
       <div class="img-panel-row">
-        <span class="img-panel-label">Idées rapides :</span>
+        <span class="img-panel-label">Idées :</span>
         <div class="img-quick-btns">
           <button class="img-quick-btn" onclick="quickImg('un chat astronaute dans l\'espace')">🐱 Chat astronaute</button>
           <button class="img-quick-btn" onclick="quickImg('une ville futuriste sous la pluie la nuit')">🌆 Ville futuriste</button>
           <button class="img-quick-btn" onclick="quickImg('une forêt enchantée avec des fées')">🌿 Forêt enchantée</button>
           <button class="img-quick-btn" onclick="quickImg('un dragon sur une montagne au coucher du soleil')">🐉 Dragon</button>
-          <button class="img-quick-btn" onclick="quickImg('un robot dans un jardin de fleurs')">🤖 Robot jardin</button>
+          <button class="img-quick-btn" onclick="quickImg('un robot dans un jardin de fleurs')">🤖 Robot</button>
         </div>
       </div>
     </div>
@@ -556,12 +483,12 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     <div id="input-area">
       <div id="file-preview-bar"></div>
       <div id="ibox">
-        <button id="attach-btn" title="Joindre un fichier" onclick="document.getElementById('file-input').click()">
+        <button id="attach-btn" title="Joindre un fichier (image, PDF, code…)" onclick="document.getElementById('file-input').click()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
           </svg>
         </button>
-        <button id="img-toggle-btn" title="Générer une image" onclick="toggleImgPanel()">🎨</button>
+        <button id="img-toggle-btn" title="Générateur d'images" onclick="toggleImgPanel()">🎨</button>
         <input type="file" id="file-input" multiple
           accept=".txt,.md,.csv,.json,.js,.ts,.jsx,.tsx,.py,.html,.css,.xml,.yaml,.yml,.pdf,.jpg,.jpeg,.png,.gif,.webp,.svg"
           onchange="handleFiles(this.files)"/>
@@ -576,14 +503,13 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
         </button>
       </div>
       <div class="input-footer">
-        <span class="input-hint">↵ envoyer · shift+↵ saut · ctrl+k nouvelle · ctrl+f chercher · esc stop</span>
+        <span class="input-hint">↵ envoyer · shift+↵ saut · ctrl+k nouvelle · ctrl+f chercher · esc stop · ctrl+r régénérer</span>
         <span id="char-count"></span>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Settings -->
 <div id="settings-backdrop" onclick="closeSettings()"></div>
 <div id="settings-panel">
   <div class="settings-title">⚙️ Paramètres<button class="settings-close" onclick="closeSettings()">×</button></div>
@@ -597,10 +523,10 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
     <button class="settings-btn secondary" onclick="exportCurrentConv()">📄 .md</button>
     <button class="settings-btn secondary" onclick="exportPDF()">🖨️ PDF</button>
     <button class="settings-btn secondary" onclick="generateTitle()">✨ Titre IA</button>
+    <button class="settings-btn secondary" onclick="clearAllConvs()">🗑️ Tout effacer</button>
   </div>
 </div>
 
-<!-- Confirm -->
 <div id="confirm-backdrop"></div>
 <div id="confirm-dialog">
   <div class="confirm-title">Supprimer la conversation ?</div>
@@ -611,7 +537,6 @@ cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
   </div>
 </div>
 
-<!-- Lightbox -->
 <div id="lightbox" onclick="closeLightbox()">
   <button id="lightbox-close" onclick="closeLightbox()">✕ Fermer</button>
   <img id="lightbox-img" src="" alt=""/>
@@ -671,6 +596,15 @@ function toggleFocus(){
   document.getElementById('focus-btn').classList.toggle('active',document.body.classList.contains('focus-mode'));
   toast(document.body.classList.contains('focus-mode')?'Mode focus activé':'Mode focus désactivé');
 }
+function clearAllConvs(){
+  closeSettings();
+  openConfirm(()=>{
+    convs={};localStorage.removeItem(CONVS_KEY);localStorage.removeItem(CUR_KEY);
+    newChat();toast('Toutes les conversations supprimées');
+  });
+  document.querySelector('.confirm-title').textContent='Tout supprimer ?';
+  document.querySelector('.confirm-sub').textContent='Toutes les conversations seront effacées.';
+}
 
 // ── STOP ──
 function setStopVisible(v){stopBtn.style.display=v?'flex':'none';sb.style.display=v?'none':'flex'}
@@ -700,7 +634,7 @@ function updateCtxBar(){
   const pct=Math.min(total/20,1);
   fill.style.width=(pct*100)+'%';
   fill.className=pct>=1?'danger':pct>=0.75?'warn':'';
-  document.getElementById('ctx-warn').textContent=total>20?'⚠ '+( total-20)+' ignorés':total>=15?'⚠ presque plein':'';
+  document.getElementById('ctx-warn').textContent=total>20?'⚠ '+(total-20)+' ignorés':total>=15?'⚠ presque plein':'';
 }
 
 // ── SCROLL ──
@@ -754,7 +688,12 @@ function navSearch(dir){
 // ── CONFIRM ──
 let confirmCallback=null;
 function openConfirm(cb){confirmCallback=cb;document.getElementById('confirm-dialog').classList.add('open');document.getElementById('confirm-backdrop').classList.add('open')}
-function closeConfirm(){document.getElementById('confirm-dialog').classList.remove('open');document.getElementById('confirm-backdrop').classList.remove('open');confirmCallback=null}
+function closeConfirm(){
+  document.getElementById('confirm-dialog').classList.remove('open');document.getElementById('confirm-backdrop').classList.remove('open');confirmCallback=null;
+  // reset title/sub au cas où
+  document.querySelector('.confirm-title').textContent='Supprimer la conversation ?';
+  document.querySelector('.confirm-sub').textContent='Cette action est irréversible.';
+}
 document.getElementById('confirm-ok-btn').onclick=()=>{if(confirmCallback)confirmCallback();closeConfirm()};
 document.getElementById('confirm-backdrop').onclick=closeConfirm;
 
@@ -775,13 +714,11 @@ function openImgPanelWithPrompt(prompt){
   if(!imgPanelOpen)toggleImgPanel();
   document.getElementById('img-prompt-input').value=prompt;
 }
-function quickImg(prompt){
-  openImgPanelWithPrompt(prompt);
-}
+function quickImg(prompt){openImgPanelWithPrompt(prompt)}
+
 async function generateImageFromPanel(){
   const promptInput=document.getElementById('img-prompt-input');
-  const rawPrompt=promptInput.value.trim();
-  if(!rawPrompt)return;
+  const rawPrompt=promptInput.value.trim();if(!rawPrompt)return;
   const style=document.getElementById('img-style').value;
   const enhance=document.getElementById('img-enhance').value;
   const sizeVal=document.getElementById('img-size').value;
@@ -976,7 +913,7 @@ function renderSidebar(){
   const query=(document.getElementById('search-input')?.value||'').toLowerCase().trim();
   let list=Object.values(convs).sort((a,b)=>b.date-a.date);
   if(query)list=list.filter(c=>c.title.toLowerCase().includes(query)||(c.messages||[]).some(m=>getDisplayText(m).toLowerCase().includes(query)));
-  if(!list.length){el.innerHTML='<div style="padding:18px 12px;text-align:center;font-size:10.5px;color:var(--text4);line-height:1.7;font-family:JetBrains Mono,monospace">'+(query?'// aucun résultat':'// aucune conversation\n// commencez à écrire !')+'</div>';return}
+  if(!list.length){el.innerHTML='<div style="padding:18px 12px;text-align:center;font-size:10.5px;color:var(--text4);line-height:1.7;font-family:JetBrains Mono,monospace">'+(query?'// aucun résultat':'// aucune conversation<br>// commencez à écrire !')+'</div>';return}
   const today=new Date();today.setHours(0,0,0,0);
   const yesterday=new Date(today);yesterday.setDate(yesterday.getDate()-1);
   const week=new Date(today);week.setDate(week.getDate()-7);
@@ -1129,7 +1066,11 @@ function addMsgDOM(role,content,ts,chips,msgId){
     });
   }
   wrap.appendChild(b);
-  const timeDiv=document.createElement('div');timeDiv.className='msg-time';timeDiv.textContent=fmtTime(now);wrap.appendChild(timeDiv);
+  const timeDiv=document.createElement('div');timeDiv.className='msg-time';
+  // Affiche mot count pour les messages IA longs
+  const wc=content?content.split(/\s+/).filter(Boolean).length:0;
+  timeDiv.innerHTML=fmtTime(now)+(role==='assistant'&&wc>30?` <span class="wc-badge">${wc} mots</span>`:'');
+  wrap.appendChild(timeDiv);
   const actions=document.createElement('div');actions.className='msg-actions';
   if(role==='assistant'){
     actions.innerHTML=`<button class="msg-action" onclick="copyMsg(this)">📋 Copier</button><button class="msg-action" onclick="regenerate()">🔄 Régénérer</button><button class="msg-action tts-btn" onclick="ttsMsg(this)" data-playing="0">🔊 TTS</button>`;
@@ -1142,7 +1083,6 @@ function addMsgDOM(role,content,ts,chips,msgId){
   return row;
 }
 
-// Image générée avancée
 function addMsgImageAdvancedDOM(url,prompt,fullPrompt,size,seed,ts){
   const now=ts||Date.now();
   const row=document.createElement('div');row.className='row assistant';
@@ -1156,19 +1096,14 @@ function addMsgImageAdvancedDOM(url,prompt,fullPrompt,size,seed,ts){
   img.onload=()=>{
     loadDiv.remove();img.style.display='block';
     img.onclick=()=>openLightbox(url);
-    // Métadonnées
     const meta=document.createElement('div');meta.className='img-meta';
     meta.textContent=`${size} · seed:${seed}`;
     b.appendChild(meta);
-    // Actions image
     const imgActions=document.createElement('div');imgActions.className='img-actions';
-    // Download
     const dlBtn=document.createElement('button');dlBtn.className='img-action-btn';dlBtn.textContent='💾 Télécharger';
     dlBtn.onclick=()=>{const a=document.createElement('a');a.href=url;a.download='ia_image_'+seed+'.jpg';a.target='_blank';a.click();toast('Téléchargement…')};
-    // Zoom
     const zoomBtn=document.createElement('button');zoomBtn.className='img-action-btn';zoomBtn.textContent='🔍 Agrandir';
     zoomBtn.onclick=()=>openLightbox(url);
-    // Regenerate same prompt
     const regenBtn=document.createElement('button');regenBtn.className='img-action-btn';regenBtn.textContent='🔄 Variante';
     regenBtn.onclick=()=>{
       const newSeed=Math.floor(Math.random()*99999);
@@ -1177,7 +1112,6 @@ function addMsgImageAdvancedDOM(url,prompt,fullPrompt,size,seed,ts){
       addMsg('user','🎨 Variante : '+prompt,prompt,[]);
       addMsgImageAdvanced(newUrl,prompt,fullPrompt,size,newSeed);
     };
-    // Copy prompt
     const cpBtn=document.createElement('button');cpBtn.className='img-action-btn';cpBtn.textContent='📋 Prompt';
     cpBtn.onclick=()=>navigator.clipboard.writeText(fullPrompt).then(()=>toast('Prompt copié ✓'));
     imgActions.append(dlBtn,zoomBtn,regenBtn,cpBtn);
@@ -1284,6 +1218,9 @@ async function streamReply(apiMessages){
       }
     }
     currentReader=null;
+    // Ajoute word count après streaming
+    const wc=fullText.split(/\s+/).filter(Boolean).length;
+    if(wc>30) t.innerHTML=fmtTime(Date.now())+` <span class="wc-badge">${wc} mots</span>`;
     const actions=document.createElement('div');actions.className='msg-actions';
     actions.innerHTML=`<button class="msg-action" onclick="copyMsg(this)">📋 Copier</button><button class="msg-action" onclick="regenerate()">🔄 Régénérer</button><button class="msg-action tts-btn" onclick="ttsMsg(this)" data-playing="0">🔊 TTS</button>`;
     wrap.appendChild(actions);lastAssistantRow=row;
@@ -1323,7 +1260,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){stopGeneration();if(document.getElementById('msg-search-bar').classList.contains('open'))closeMsgSearch();closeLightbox()}
 });
 
-// Paste image depuis clipboard
+// Coller image depuis clipboard
 document.addEventListener('paste',async e=>{
   const items=[...(e.clipboardData?.items||[])];
   const imgItem=items.find(i=>i.type.startsWith('image/'));
@@ -1387,8 +1324,3 @@ load();
 </script>
 </body>
 </html>
-ENDOFFILE
-echo "Done"
-
-Sortie
-Done
