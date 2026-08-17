@@ -1,0 +1,14 @@
+{
+  "name": "IA Performante",
+  "short_name": "IA Performante",
+  "description": "Assistant IA moderne : chat, vision, génération d'images, PDF.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080f0a",
+  "theme_color": "#0b1610",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
