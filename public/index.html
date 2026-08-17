@@ -379,7 +379,7 @@
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
       <div class="footer-row">
-        <div style="display:flex;align-items:center;gap:5px"><div class="status-dot"></div><span id="model-label">Llama 3.3 70B</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div class="status-dot"></div><span id="model-label">GPT-OSS 120B</span></div>
         <span id="conv-count">0 convs</span>
       </div>
       <div class="footer-btns">
@@ -412,12 +412,10 @@
       <div class="header-right">
         <div id="token-display" onclick="openSettings()" title="Tokens utilisés — clic pour paramètres">0 tok</div>
         <select id="model-select" onchange="onModelChange()">
-          <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
-          <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
-          <option value="gemma2-9b-it">Gemma2 9B</option>
-          <option value="llama-3.1-8b-instant">Llama 3.1 8B ⚡</option>
-          <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 👁️</option>
-          <option value="meta-llama/llama-4-maverick-17b-128e-instruct">Llama 4 Maverick 👁️</option>
+          <option value="openai/gpt-oss-120b">GPT-OSS 120B (puissant)</option>
+          <option value="openai/gpt-oss-20b">GPT-OSS 20B ⚡ (rapide)</option>
+          <option value="qwen/qwen3.6-27b">Qwen3.6 27B 👁️ (vision)</option>
+          <option value="gemma2-9b-it">Gemma2 9B (léger)</option>
         </select>
         <div class="temp-wrap">
           <span class="temp-label">🌡 <span id="temp-val">0.7</span></span>
@@ -644,13 +642,13 @@ if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudf
 const CONVS_KEY='ia_convs_v8',CUR_KEY='ia_cur_v8',SETTINGS_KEY='ia_settings_v4';
 let convs={},currentId=null,loading=false,pendingFiles=[];
 let settings={systemPrompt:'',fontSize:13,theme:'dark'};
-let currentModel='llama-3.3-70b-versatile';
+let currentModel='openai/gpt-oss-120b';
 let lastAssistantRow=null,currentReader=null,currentTTS=null;
 let pinnedMsg=null;
 let currentLightboxUrl='';
  
-const VISION_MODELS=['meta-llama/llama-4-scout-17b-16e-instruct','meta-llama/llama-4-maverick-17b-128e-instruct'];
-const DEFAULT_VISION_MODEL='meta-llama/llama-4-scout-17b-16e-instruct';
+const VISION_MODELS=['qwen/qwen3.6-27b'];
+const DEFAULT_VISION_MODEL='qwen/qwen3.6-27b';
  
 const PRESETS={
   expert:'Tu es un expert de très haut niveau. Tes réponses sont techniques, précises, exhaustives. Tu utilises la terminologie correcte et tu cites des sources ou des concepts avancés quand c\'est pertinent.',
@@ -697,7 +695,7 @@ function toggleTheme(){settings.theme=settings.theme==='dark'?'light':'dark';app
 function changeFont(d){settings.fontSize=Math.min(18,Math.max(11,(settings.fontSize||13)+d));applySettings();saveSettingsData()}
 function onModelChange(){
   currentModel=document.getElementById('model-select').value;
-  const labels={'llama-3.3-70b-versatile':'Llama 3.3 70B','mixtral-8x7b-32768':'Mixtral 8x7B','gemma2-9b-it':'Gemma2 9B','llama-3.1-8b-instant':'Llama 3.1 8B','meta-llama/llama-4-scout-17b-16e-instruct':'Llama 4 Scout 👁️','meta-llama/llama-4-maverick-17b-128e-instruct':'Llama 4 Maverick 👁️'};
+  const labels={'openai/gpt-oss-120b':'GPT-OSS 120B','openai/gpt-oss-20b':'GPT-OSS 20B ⚡','qwen/qwen3.6-27b':'Qwen3.6 27B 👁️','gemma2-9b-it':'Gemma2 9B'};
   document.getElementById('model-label').textContent=labels[currentModel]||currentModel;
   toast('Modèle : '+(labels[currentModel]||currentModel));
 }
@@ -994,7 +992,7 @@ async function generateTitle(){
   try{
     const ctx=c.messages.slice(0,4).map(m=>`${m.role}: ${getDisplayText(m).slice(0,200)}`).join('\n');
     const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'llama-3.1-8b-instant',temperature:0.3,stream:false,
+      body:JSON.stringify({model:'openai/gpt-oss-20b',temperature:0.3,stream:false,
         messages:[{role:'user',content:`Génère un titre très court (5 mots max, sans guillemets) pour cette conversation :\n${ctx}`}]})});
     const data=await r.json();
     const title=data.choices?.[0]?.message?.content?.replace(/["'«»]/g,'').trim().slice(0,50);
@@ -1048,7 +1046,7 @@ async function handleFiles(fileList){
     const isImg=file.type.startsWith('image/');
     const isPdf=file.name.endsWith('.pdf')||file.type==='application/pdf';
     let text='',isImage=false,dataUrl=null;
-    if(isImg){isImage=true;dataUrl=await readImageAsDataUrl(file);text=`[Image: ${file.name}]`;toast('🖼️ Image → Llama 4 Scout Vision')}
+    if(isImg){isImage=true;dataUrl=await readImageAsDataUrl(file);text=`[Image: ${file.name}]`;toast('🖼️ Image → Qwen3.6 27B Vision')}
     else if(isPdf){text=window.pdfjsLib?(await extractPdfText(file)).slice(0,6000):'[PDF.js non disponible]'}
     else{text=(await extractText(file)).slice(0,6000)}
     pendingFiles[idx]={name:file.name,size:file.size,type:file.type,text,isImage,dataUrl,loading:false};
@@ -1255,7 +1253,7 @@ function addMsgDOM(role,content,ts,chips,msgId){
         const img=document.createElement('img');img.src=chip.dataUrl;img.className='msg-img-preview';img.alt=chip.name;
         img.onclick=()=>openLightbox(chip.dataUrl);
         b.appendChild(img);
-        const badge=document.createElement('div');badge.className='vision-badge';badge.textContent='👁️ Llama 4 Scout Vision';
+        const badge=document.createElement('div');badge.className='vision-badge';badge.textContent='👁️ Qwen3.6 27B Vision';
         b.appendChild(badge);
       } else {
         const d=document.createElement('div');d.className='msg-file-chip';
