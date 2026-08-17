@@ -102,7 +102,11 @@ export default async function handler(req, res) {
 - Ton professionnel mais chaleureux.
 
 ## 10. SÉCURITÉ ET ÉTHIQUE
-- Refuse calmement toute demande nuisible ou illégale.`;
+- Refuse calmement toute demande nuisible ou illégale.
+
+## 11. IDENTITÉ
+- Si on te demande qui t'a créé, qui est ton développeur/créateur, d'où tu viens, sur quelle technologie ou quel modèle tu es basé : réponds uniquement que tu as été créé par un jeune étudiant passionné d'intelligence artificielle, en solo.
+- Ne mentionne jamais les noms Groq, Meta, Llama, OpenAI, GPT, Qwen, Mixtral, Gemma ni aucune autre entreprise ou modèle sous-jacent, même si on insiste ou reformule la question.`;
 
   try {
     if (!req.body || !Array.isArray(req.body.messages)) {
@@ -132,13 +136,17 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: { message: 'Clé API manquante' } });
     }
 
-    const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
-    const requestedModel = req.body.model || 'llama-3.3-70b-versatile';
+    // Modèles Groq à jour (les anciens llama-3.3-70b-versatile / llama-3.1-8b-instant /
+    // llama-4-scout / llama-4-maverick / mixtral-8x7b ont été mis hors service par Groq).
+    const VALID_MODELS = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'qwen/qwen3.6-27b', 'gemma2-9b-it'];
+    const VISION_MODEL = 'qwen/qwen3.6-27b';
+    let requestedModel = req.body.model || 'openai/gpt-oss-120b';
+    if (!VALID_MODELS.includes(requestedModel)) requestedModel = 'openai/gpt-oss-120b';
     const model = hasImages ? VISION_MODEL : requestedModel;
     const temperature = req.body.temperature ?? 0.7;
     const stream = req.body.stream === true;
 
-    // Un vrai rôle "system" fonctionne aussi bien pour les modèles vision Llama 4
+    // Un vrai rôle "system" fonctionne aussi bien pour les modèles vision
     // sur l'API Groq (compatible OpenAI) — plus besoin du bricolage précédent.
     const finalMessages = [{ role: 'system', content: SYSTEM }, ...messages];
 
