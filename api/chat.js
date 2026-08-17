@@ -1,11 +1,71 @@
+// ── Anti-abus gratuit (rien à payer) ──────────────────────────────────────
+// 1) CORS restreint à ton propre domaine (empêche d'autres sites d'utiliser ta clé).
+// 2) Rate limiting en mémoire par IP (best-effort : ça vit tant que l'instance
+//    serverless reste "chaude" ; ce n'est pas parfait mais ça coûte 0€ et ça
+//    bloque déjà l'essentiel des abus/scripts).
+// 3) Validation basique de la taille de la requête pour éviter les factures Groq surprises.
+
+const ALLOWED_ORIGINS = [
+  'https://ia-performante.vercel.app',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : [])
+];
+
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const RATE_LIMIT_MAX = 30; // 30 requêtes / 5 min / IP
+const MAX_MESSAGES = 30;
+const MAX_TOTAL_CHARS = 60000; // ~15k tokens de contexte max envoyés à Groq
+
+// Persiste tant que l'instance serverless reste chaude (gratuit, pas de DB).
+const rateBuckets = globalThis.__iaRateBuckets || (globalThis.__iaRateBuckets = new Map());
+
+function getClientIp(req) {
+  const fwd = req.headers['x-forwarded-for'];
+  if (fwd) return fwd.split(',')[0].trim();
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const bucket = rateBuckets.get(ip);
+  if (!bucket || now - bucket.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateBuckets.set(ip, { windowStart: now, count: 1 });
+    return false;
+  }
+  bucket.count += 1;
+  return bucket.count > RATE_LIMIT_MAX;
+}
+
+function estimateContentLength(content) {
+  if (Array.isArray(content)) {
+    return content.reduce((sum, part) => {
+      if (part.type === 'text') return sum + (part.text?.length || 0);
+      if (part.type === 'image_url') return sum + 200; // les images ne comptent pas pour le quota texte
+      return sum;
+    }, 0);
+  }
+  return String(content || '').length;
+}
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Vary', 'Origin');
+
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const SYSTEM = req.body.systemPrompt || `Tu es un assistant IA de très haut niveau, expert généraliste et spécialiste à la demande. Tu es rigoureux, honnête, précis, et tu t'adaptes au niveau et au contexte de chaque utilisateur.
+  const ip = getClientIp(req);
+  if (isRateLimited(ip)) {
+    return res.status(429).json({ error: { message: 'Trop de requêtes — réessaie dans quelques minutes.' } });
+  }
+
+  const SYSTEM = req.body?.systemPrompt || `Tu es un assistant IA de très haut niveau, expert généraliste et spécialiste à la demande. Tu es rigoureux, honnête, précis, et tu t'adaptes au niveau et au contexte de chaque utilisateur.
 
 ## 1. PRÉCISION ABSOLUE
 - Ne génère JAMAIS d'information inventée. Si tu n'es pas sûr : "Je ne suis pas certain, mais voici ce que je sais : ..."
@@ -49,10 +109,19 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: { message: 'Messages invalides' } });
     }
 
-    const messages = req.body.messages.slice(-20).map(m => ({
+    if (req.body.messages.length > MAX_MESSAGES) {
+      return res.status(400).json({ error: { message: `Trop de messages (max ${MAX_MESSAGES})` } });
+    }
+
+    const messages = req.body.messages.slice(-MAX_MESSAGES).map(m => ({
       role: m.role,
       content: Array.isArray(m.content) ? m.content : String(m.content || '')
     }));
+
+    const totalChars = messages.reduce((sum, m) => sum + estimateContentLength(m.content), 0);
+    if (totalChars > MAX_TOTAL_CHARS) {
+      return res.status(400).json({ error: { message: 'Message trop long, raccourcis ta demande.' } });
+    }
 
     const hasImages = messages.some(m =>
       Array.isArray(m.content) && m.content.some(c => c.type === 'image_url')
@@ -69,9 +138,9 @@ export default async function handler(req, res) {
     const temperature = req.body.temperature ?? 0.7;
     const stream = req.body.stream === true;
 
-    const finalMessages = hasImages
-      ? [{ role: 'user', content: `[Système: ${SYSTEM}]\n\n[Message:]` }, ...messages]
-      : [{ role: 'system', content: SYSTEM }, ...messages];
+    // Un vrai rôle "system" fonctionne aussi bien pour les modèles vision Llama 4
+    // sur l'API Groq (compatible OpenAI) — plus besoin du bricolage précédent.
+    const finalMessages = [{ role: 'system', content: SYSTEM }, ...messages];
 
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
