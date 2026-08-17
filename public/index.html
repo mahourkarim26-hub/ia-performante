@@ -1,6 +1,3 @@
-
-
-<!DOCTYPE html>
 <html lang="fr" data-theme="dark">
 <head>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6812678786659237"
@@ -11,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljs-theme">
   <style>
     :root[data-theme="dark"]{
@@ -754,17 +752,19 @@ function updateTokenDisplay(){
 }
  
 // ── CTX BAR ──
+const CTX_TOKEN_LIMIT=8000;
 function updateCtxBar(){
   const bar=document.getElementById('ctx-bar');
   if(!currentId||!convs[currentId]){bar.classList.add('hidden');return}
-  const total=convs[currentId].messages.length;
+  const tok=convs[currentId].messages.reduce((s,m)=>s+estTok(m.content||''),0);
   bar.classList.remove('hidden');
-  document.getElementById('ctx-label').textContent=total+'/20 msgs';
+  const tokLabel=tok>1000?(tok/1000).toFixed(1)+'k':tok;
+  document.getElementById('ctx-label').textContent=tokLabel+'/'+(CTX_TOKEN_LIMIT/1000)+'k tok';
   const fill=document.getElementById('ctx-fill');
-  const pct=Math.min(total/20,1);
+  const pct=Math.min(tok/CTX_TOKEN_LIMIT,1);
   fill.style.width=(pct*100)+'%';
   fill.className=pct>=1?'danger':pct>=0.75?'warn':'';
-  document.getElementById('ctx-warn').textContent=total>20?'⚠ '+(total-20)+' ignorés':total>=15?'⚠ presque plein':'';
+  document.getElementById('ctx-warn').textContent=tok>=CTX_TOKEN_LIMIT?'⚠ limite atteinte, anciens messages ignorés':pct>=0.75?'⚠ presque plein':'';
 }
  
 // ── PINNED MESSAGE ──
@@ -887,30 +887,60 @@ async function generateImageFromPanel(){
   promptInput.value='';
 }
  
-// ── EXPORT PDF ──
-function exportPDF(){
+// ── EXPORT PDF (jsPDF — vrai fichier PDF téléchargeable, gratuit) ──
+async function exportPDF(){
   if(!currentId||!convs[currentId]){toast('Aucune conversation ouverte');return}
+  if(!window.jspdf){toast('Erreur: librairie PDF non chargée');return}
   closeSettings();
   const c=convs[currentId];
-  let html='<html><head><meta charset="UTF-8"><title>'+c.title+'</title>';
-  html+='<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#111;line-height:1.7}';
-  html+='.msg{margin-bottom:20px;padding:12px 16px;border-radius:8px}';
-  html+='.usr{background:#f0fdf4;border-left:3px solid #22c55e}.ai{background:#f9fafb;border-left:3px solid #9ca3af}';
-  html+='.role{font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:5px}';
-  html+='pre{background:#1e1e1e;color:#d4d4d4;padding:10px;border-radius:4px;font-size:12px;overflow-x:auto}';
-  html+='@media print{body{margin:20px}}</style></head><body>';
-  html+='<h1 style="font-size:20px;margin-bottom:4px">'+esc(c.title)+'</h1>';
-  html+='<p style="color:#9ca3af;font-size:11px;margin-bottom:24px">'+new Date().toLocaleString('fr-FR')+' · '+c.messages.length+' messages</p>';
-  c.messages.forEach(m=>{
-    if(m.type==='image'){html+=`<div class="msg ai"><div class="role">Image générée</div><img src="${m.url}" style="max-width:400px;border-radius:8px"/></div>`;return}
-    const content=getDisplayText(m).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-    html+=`<div class="msg ${m.role==='user'?'usr':'ai'}"><div class="role">${m.role==='user'?'Vous':'IA Performante'}</div>${content}</div>`;
-  });
-  html+='</body></html>';
-  const win=window.open('','_blank');
-  if(!win){toast('Autorise les popups !');return}
-  win.document.write(html);win.document.close();setTimeout(()=>win.print(),400);
-  toast('Fenêtre d\'impression ouverte');
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'pt',format:'a4'});
+  const pageW=doc.internal.pageSize.getWidth();
+  const pageH=doc.internal.pageSize.getHeight();
+  const margin=44;
+  const maxW=pageW-margin*2;
+  let y=margin;
+
+  function ensureSpace(h){
+    if(y+h>pageH-margin){doc.addPage();y=margin;}
+  }
+  function addTitle(text){
+    doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(20,60,30);
+    const lines=doc.splitTextToSize(text,maxW);
+    ensureSpace(lines.length*20);
+    doc.text(lines,margin,y);y+=lines.length*20+4;
+  }
+  function addMeta(text){
+    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(140,140,140);
+    ensureSpace(14);doc.text(text,margin,y);y+=20;
+  }
+  function addRole(role){
+    doc.setFont('helvetica','bold');doc.setFontSize(9);
+    doc.setTextColor(role==='user'?22:100,role==='user'?130:100,role==='user'?60:100);
+    ensureSpace(12);doc.text(role==='user'?'VOUS':'IA PERFORMANTE',margin,y);y+=13;
+  }
+  function addBody(text){
+    doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(20,20,20);
+    const lines=doc.splitTextToSize(text||'',maxW);
+    for(const line of lines){ensureSpace(14);doc.text(line,margin,y);y+=14;}
+    y+=10;
+  }
+
+  addTitle(c.title);
+  addMeta(new Date().toLocaleString('fr-FR')+' · '+c.messages.length+' messages');
+
+  for(const m of c.messages){
+    if(m.type==='image'){
+      addRole('assistant');
+      addBody('[Image générée] '+(m.displayContent||''));
+      continue;
+    }
+    addRole(m.role);
+    addBody(getDisplayText(m));
+  }
+
+  doc.save((c.title||'conversation').replace(/[^a-z0-9]/gi,'_').slice(0,40)+'.pdf');
+  toast('PDF téléchargé ✓');
 }
  
 function getDisplayText(m){
