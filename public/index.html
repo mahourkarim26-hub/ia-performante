@@ -3,8 +3,19 @@
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6812678786659237"
      crossorigin="anonymous"></script>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
   <title>IA Performante</title>
+  <meta name="description" content="IA Performante — assistant IA moderne : chat, vision, génération d'images, PDF."/>
+  <meta name="theme-color" content="#0b1610"/>
+  <meta property="og:title" content="IA Performante"/>
+  <meta property="og:description" content="Assistant IA moderne : chat, vision, génération d'images, PDF."/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://ia-performante.vercel.app"/>
+  <meta property="og:image" content="https://ia-performante.vercel.app/icon-512.png"/>
+  <meta name="twitter:card" content="summary"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
+  <link rel="apple-touch-icon" href="/icon-192.png"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -230,7 +241,7 @@
     #lightbox-dl:hover{background:rgba(74,222,128,0.25)}
  
     /* INPUT */
-    #input-area{padding:7px 14px 14px;border-top:1px solid var(--border);background:rgba(8,15,10,0.7);backdrop-filter:blur(20px);flex-shrink:0;z-index:10}
+    #input-area{padding:7px 14px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:rgba(8,15,10,0.7);backdrop-filter:blur(20px);flex-shrink:0;z-index:10}
     [data-theme="light"] #input-area{background:rgba(240,253,244,0.85)}
     #file-preview-bar{display:none;flex-wrap:wrap;gap:5px;padding:5px 2px 7px}
     #file-preview-bar.has-files{display:flex}
@@ -956,9 +967,24 @@ function load(){
   renderSidebar();
   if(currentId&&convs[currentId])loadConv(currentId);
 }
+let storageWarnShown=false;
+function checkStorageQuota(jsonStr){
+  const sizeMB=jsonStr.length/1024/1024;
+  if(sizeMB>4&&!storageWarnShown){
+    storageWarnShown=true;
+    toast('⚠️ Stockage presque plein — pense à exporter/supprimer d\'anciennes conversations',4000);
+  }
+}
 function save(){
-  try{localStorage.setItem(CONVS_KEY,JSON.stringify(convs));if(currentId)localStorage.setItem(CUR_KEY,currentId)}
-  catch(e){console.warn('localStorage plein',e)}
+  try{
+    const json=JSON.stringify(convs);
+    checkStorageQuota(json);
+    localStorage.setItem(CONVS_KEY,json);if(currentId)localStorage.setItem(CUR_KEY,currentId)
+  }
+  catch(e){
+    console.warn('localStorage plein',e);
+    toast('❌ Stockage plein — exporte puis supprime de vieilles conversations',5000);
+  }
 }
  
 // ── EXPORT / IMPORT ──
@@ -1088,17 +1114,27 @@ function buildApiMessages(storedMessages){
 }
  
 // ── SIDEBAR ──
+function normalizeSearch(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
+function toggleFavorite(id,e){
+  e.stopPropagation();
+  if(!convs[id])return;
+  convs[id].favorite=!convs[id].favorite;
+  save();renderSidebar();
+  toast(convs[id].favorite?'⭐ Ajouté aux favoris':'Retiré des favoris');
+}
 function renderSidebar(){
   const el=document.getElementById('sidebar-list');
-  const query=(document.getElementById('search-input')?.value||'').toLowerCase().trim();
+  const query=normalizeSearch(document.getElementById('search-input')?.value||'').trim();
   let list=Object.values(convs).sort((a,b)=>b.date-a.date);
-  if(query)list=list.filter(c=>c.title.toLowerCase().includes(query)||(c.messages||[]).some(m=>getDisplayText(m).toLowerCase().includes(query)));
+  if(query)list=list.filter(c=>normalizeSearch(c.title).includes(query)||(c.messages||[]).some(m=>normalizeSearch(getDisplayText(m)).includes(query)));
   if(!list.length){el.innerHTML='<div style="padding:18px 12px;text-align:center;font-size:10.5px;color:var(--text4);line-height:1.7;font-family:JetBrains Mono,monospace">'+(query?'// aucun résultat':'// aucune conversation<br>// commencez à écrire !')+'</div>';return}
+  const favorites=list.filter(c=>c.favorite);
+  const rest=list.filter(c=>!c.favorite);
   const today=new Date();today.setHours(0,0,0,0);
   const yesterday=new Date(today);yesterday.setDate(yesterday.getDate()-1);
   const week=new Date(today);week.setDate(week.getDate()-7);
-  const groups={"Aujourd'hui":[],"Hier":[],"Cette semaine":[],"Plus ancien":[]};
-  list.forEach(c=>{const d=new Date(c.date);d.setHours(0,0,0,0);
+  const groups={"⭐ Favoris":favorites,"Aujourd'hui":[],"Hier":[],"Cette semaine":[],"Plus ancien":[]};
+  rest.forEach(c=>{const d=new Date(c.date);d.setHours(0,0,0,0);
     if(d>=today)groups["Aujourd'hui"].push(c);
     else if(d>=yesterday)groups["Hier"].push(c);
     else if(d>=week)groups["Cette semaine"].push(c);
@@ -1122,6 +1158,7 @@ function renderSidebar(){
           <div class="conv-date">${fmtDate(c.date)} · ${msgs.length} msg</div>
         </div>
         <div class="conv-actions">
+          <button class="conv-action-btn" onclick="toggleFavorite('${c.id}',event)" title="${c.favorite?'Retirer des favoris':'Ajouter aux favoris'}">${c.favorite?'⭐':'☆'}</button>
           <button class="conv-action-btn" onclick="startRenameConv('${c.id}',event)" title="Renommer">✏️</button>
           <button class="conv-action-btn del" onclick="delConv('${c.id}',event)" title="Supprimer">🗑️</button>
         </div>`;
@@ -1331,7 +1368,37 @@ function addMsgImageAdvancedDOM(url,prompt,fullPrompt,size,seed,ts){
     b.appendChild(imgActions);
     msgEl.scrollTop=msgEl.scrollHeight;
   };
-  img.onerror=()=>{loadDiv.innerHTML='❌ Échec — essaie un autre prompt'};
+  let settled=false;
+  const timeoutId=setTimeout(()=>{
+    if(settled)return;settled=true;
+    img.src='';
+    loadDiv.innerHTML='';
+    const retryBtn=document.createElement('button');
+    retryBtn.className='img-action-btn';retryBtn.textContent='⏱️ Trop long — 🔄 Réessayer';
+    retryBtn.onclick=()=>{
+      const newSeed=Math.floor(Math.random()*99999);
+      const[w,h]=size.split('x');
+      const newUrl=`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&nologo=true&seed=${newSeed}&enhance=true`;
+      addMsgImageAdvancedDOM(newUrl,prompt,fullPrompt,size,newSeed,Date.now());
+      row.remove();
+    };
+    loadDiv.appendChild(retryBtn);
+  },25000);
+  img.onerror=()=>{
+    if(settled)return;settled=true;clearTimeout(timeoutId);
+    loadDiv.innerHTML='';
+    const errSpan=document.createElement('span');errSpan.textContent='❌ Échec de génération — ';
+    const retryBtn=document.createElement('button');retryBtn.className='img-action-btn';retryBtn.textContent='🔄 Réessayer';
+    retryBtn.onclick=()=>{
+      const newSeed=Math.floor(Math.random()*99999);
+      const[w,h]=size.split('x');
+      const newUrl=`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${w}&height=${h}&nologo=true&seed=${newSeed}&enhance=true`;
+      addMsgImageAdvancedDOM(newUrl,prompt,fullPrompt,size,newSeed,Date.now());
+      row.remove();
+    };
+    loadDiv.append(errSpan,retryBtn);
+  };
+  img.addEventListener('load',()=>{settled=true;clearTimeout(timeoutId)});
   img.src=url;b.appendChild(img);wrap.appendChild(b);
   const t=document.createElement('div');t.className='msg-time';t.textContent=fmtTime(now);wrap.appendChild(t);
   row.appendChild(wrap);msgEl.appendChild(row);msgEl.scrollTop=msgEl.scrollHeight;return row;
@@ -1366,7 +1433,7 @@ function editMsg(btn){
   cancelBtn.onclick=()=>{bubble.innerHTML=original};
   saveBtn.onclick=async()=>{
     const newText=editTA.value.trim();if(!newText||loading)return;
-    bubble.innerHTML=newText;
+    bubble.textContent=newText;
     const c=convs[currentId];if(!c)return;
     const rows=[...msgEl.querySelectorAll('.row')];const rowIdx=rows.indexOf(row);
     rows.slice(rowIdx+1).forEach(r=>r.remove());
@@ -1451,9 +1518,28 @@ async function streamReply(apiMessages){
     return fullText;
   }catch(e){
     rmTyping();currentReader=null;
-    if(e.name!=='AbortError')addMsg('assistant','❌ '+e.message,'❌ '+e.message,[]);
+    if(e.name!=='AbortError'){
+      const isNetwork=e instanceof TypeError||e.message==='Failed to fetch';
+      const msg=isNetwork?'❌ Connexion perdue. Vérifie ton réseau puis réessaie.':'❌ '+e.message;
+      const row=document.createElement('div');row.className='row assistant';
+      row.appendChild(makeAiAvatar());
+      const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;max-width:76%';
+      const b=document.createElement('div');b.className='bubble ai';b.textContent=msg;
+      wrap.appendChild(b);
+      const retryBtn=document.createElement('button');retryBtn.className='msg-action';retryBtn.style.marginTop='4px';retryBtn.textContent='🔄 Réessayer';
+      retryBtn.onclick=()=>{row.remove();regenerateFromMessages(apiMessages)};
+      wrap.appendChild(retryBtn);
+      row.appendChild(wrap);msgEl.appendChild(row);msgEl.scrollTop=msgEl.scrollHeight;
+    }
     throw e;
   }
+}
+ 
+async function regenerateFromMessages(apiMessages){
+  if(loading)return;
+  loading=true;sb.disabled=true;setStopVisible(true);
+  try{await streamReply(apiMessages)}
+  finally{loading=false;setStopVisible(false);updateSendBtn()}
 }
  
 // ── REGENERATE ──
@@ -1540,6 +1626,22 @@ function closeSidebar(){document.getElementById('sidebar').classList.remove('ope
 function toast(msg,duration=2500){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   clearTimeout(t._to);t._to=setTimeout(()=>t.classList.remove('show'),duration);
+}
+ 
+// ── VIEWPORT MOBILE (évite que le clavier virtuel recouvre la zone de saisie) ──
+if(window.visualViewport){
+  const vv=window.visualViewport;
+  const onVVResize=()=>{
+    const offset=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);
+    document.getElementById('app').style.height=vv.height+'px';
+    document.getElementById('input-area').style.paddingBottom=(offset>0?'14px':'14px');
+  };
+  vv.addEventListener('resize',onVVResize);
+  vv.addEventListener('scroll',onVVResize);
+}
+ 
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{})});
 }
  
 load();
