@@ -612,6 +612,7 @@
     <button class="settings-btn secondary" onclick="exportCurrentConv()">📄 .md</button>
     <button class="settings-btn secondary" onclick="exportPDF()">🖨️ PDF</button>
     <button class="settings-btn secondary" onclick="generateTitle()">✨ Titre IA</button>
+    <button class="settings-btn secondary" onclick="shareCurrentConv()">🔗 Partager</button>
     <button class="settings-btn secondary" onclick="clearAllConvs()">🗑️ Tout effacer</button>
   </div>
 </div>
@@ -631,7 +632,42 @@
   <div class="shortcut-row"><span class="shortcut-desc">Raccourcis clavier</span><span class="shortcut-key">Ctrl + /</span></div>
 </div>
  
-<!-- Auth modal (Supabase) -->
+<!-- Share modal -->
+<div id="share-backdrop" onclick="closeShareModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:198;backdrop-filter:blur(4px)"></div>
+<div id="share-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:14px;padding:20px;width:min(420px,92vw);z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+  <div class="settings-title">🔗 Partager cette conversation<button class="settings-close" onclick="closeShareModal()">×</button></div>
+  <div id="share-loading" style="font-size:12px;color:var(--text3);text-align:center;padding:16px">Génération du lien…</div>
+  <div id="share-result" style="display:none">
+    <p style="font-size:11.5px;color:var(--text3);margin-bottom:10px;line-height:1.6">Ce lien permet à n'importe qui de lire ta conversation (lecture seule, sans compte requis).</p>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="text" id="share-link-input" readonly style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:11px;font-family:'JetBrains Mono',monospace;outline:none"/>
+      <button class="settings-btn" onclick="copyShareLink()" id="share-copy-btn">📋 Copier</button>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="settings-btn secondary" onclick="deleteShare()" style="font-size:10px;color:#f87171;border-color:rgba(248,113,113,0.3)">🗑️ Supprimer le lien</button>
+    </div>
+  </div>
+  <div id="share-error" style="display:none;font-size:11.5px;color:#f87171;text-align:center;padding:12px"></div>
+</div>
+
+<!-- Page de visualisation de partage (affichée si URL contient ?share=CODE) -->
+<div id="share-view" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:600;overflow-y:auto">
+  <div style="max-width:760px;margin:0 auto;padding:24px 16px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <div class="brand-logo" style="width:28px;height:28px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--text)" id="share-view-title">Conversation partagée</div>
+        <div style="font-size:9.5px;color:var(--text4);font-family:'JetBrains Mono',monospace">IA Performante · lecture seule</div>
+      </div>
+      <a href="/" style="margin-left:auto;padding:5px 12px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:7px;color:#fff;font-size:11px;font-family:'Space Grotesk',sans-serif;font-weight:600;text-decoration:none">Essayer IA Performante →</a>
+    </div>
+    <div id="share-view-messages"></div>
+  </div>
+</div>
 <div id="auth-backdrop" onclick="closeAuthModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:198;backdrop-filter:blur(4px)"></div>
 <div id="auth-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:14px;padding:20px;width:min(360px,90vw);z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
   <div class="settings-title">☁️ Synchronisation<button class="settings-close" onclick="closeAuthModal()">×</button></div>
@@ -1100,6 +1136,118 @@ if(supa){
   });
 }
  
+// ── PARTAGE PUBLIC DE CONVERSATIONS ──
+let currentShareCode = null;
+
+function generateShareCode(){
+  const chars='abcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from({length:10},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+}
+
+async function shareCurrentConv(){
+  if(!currentId||!convs[currentId]){toast('Aucune conversation ouverte');return}
+  if(!currentUser){toast('Connecte-toi pour partager une conversation');closeSettings();openAuthModal();return}
+  closeSettings();
+  // Ouvrir la modale
+  document.getElementById('share-modal').style.display='block';
+  document.getElementById('share-backdrop').style.display='block';
+  document.getElementById('share-loading').style.display='block';
+  document.getElementById('share-result').style.display='none';
+  document.getElementById('share-error').style.display='none';
+  currentShareCode=null;
+  try{
+    // Vérifier si un partage existe déjà pour cette conv
+    const{data:existing}=await supa.from('shared_conversations').select('share_code').eq('conversation_id',currentId).eq('user_id',currentUser.id).maybeSingle();
+    if(existing){
+      currentShareCode=existing.share_code;
+    } else {
+      // Créer un nouveau partage
+      const code=generateShareCode();
+      const{error}=await supa.from('shared_conversations').insert({
+        conversation_id:currentId,
+        user_id:currentUser.id,
+        share_code:code
+      });
+      if(error)throw error;
+      currentShareCode=code;
+    }
+    const link=`${window.location.origin}/?share=${currentShareCode}`;
+    document.getElementById('share-link-input').value=link;
+    document.getElementById('share-loading').style.display='none';
+    document.getElementById('share-result').style.display='block';
+  }catch(e){
+    document.getElementById('share-loading').style.display='none';
+    document.getElementById('share-error').style.display='block';
+    document.getElementById('share-error').textContent='Erreur : '+e.message;
+  }
+}
+
+function copyShareLink(){
+  const link=document.getElementById('share-link-input').value;
+  navigator.clipboard.writeText(link).then(()=>{
+    const btn=document.getElementById('share-copy-btn');
+    btn.textContent='✓ Copié !';setTimeout(()=>btn.textContent='📋 Copier',2000);
+  });
+}
+
+async function deleteShare(){
+  if(!currentShareCode||!currentUser)return;
+  try{
+    await supa.from('shared_conversations').delete().eq('share_code',currentShareCode).eq('user_id',currentUser.id);
+    closeShareModal();toast('Lien de partage supprimé');
+  }catch(e){toast('Erreur suppression')}
+}
+
+function closeShareModal(){
+  document.getElementById('share-modal').style.display='none';
+  document.getElementById('share-backdrop').style.display='none';
+}
+
+// ── LECTURE D'UN PARTAGE PUBLIC ──
+async function checkAndRenderShare(){
+  const params=new URLSearchParams(window.location.search);
+  const code=params.get('share');
+  if(!code)return false;
+  // Afficher la vue partage
+  document.getElementById('share-view').style.display='block';
+  document.getElementById('app').style.display='none';
+  try{
+    // 1. Récupérer le share_code
+    const{data:share,error:shareErr}=await supa.from('shared_conversations').select('conversation_id').eq('share_code',code).maybeSingle();
+    if(shareErr||!share){
+      document.getElementById('share-view-messages').innerHTML='<p style="color:#f87171;text-align:center;margin-top:40px">❌ Ce lien de partage est invalide ou a expiré.</p>';
+      return true;
+    }
+    // 2. Récupérer la conversation
+    const{data:conv,error:convErr}=await supa.from('conversations').select('title,messages').eq('id',share.conversation_id).maybeSingle();
+    if(convErr||!conv){
+      document.getElementById('share-view-messages').innerHTML='<p style="color:#f87171;text-align:center;margin-top:40px">❌ Conversation introuvable.</p>';
+      return true;
+    }
+    document.getElementById('share-view-title').textContent=conv.title||'Conversation partagée';
+    const container=document.getElementById('share-view-messages');
+    container.innerHTML='';
+    (conv.messages||[]).forEach(m=>{
+      if(m.type==='image'){
+        const div=document.createElement('div');div.style.cssText='margin-bottom:16px';
+        div.innerHTML=`<div style="font-size:10px;color:var(--text4);margin-bottom:6px;font-family:JetBrains Mono,monospace">IA · Image générée</div><img src="${m.url}" style="max-width:320px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.3)"/>`;
+        container.appendChild(div);return;
+      }
+      const text=typeof m.displayContent==='string'?m.displayContent:typeof m.content==='string'?m.content:'';
+      const isUser=m.role==='user';
+      const div=document.createElement('div');
+      div.style.cssText=`margin-bottom:16px;display:flex;${isUser?'justify-content:flex-end':''}`;
+      const bubble=document.createElement('div');
+      bubble.style.cssText=`max-width:76%;padding:9px 12px;font-size:13px;line-height:1.7;font-family:'Space Grotesk',sans-serif;word-break:break-word;${isUser?'background:linear-gradient(135deg,var(--bubble-usr-from),var(--bubble-usr-to));color:#dcfce7;border-radius:12px 4px 12px 12px':'background:var(--bubble-ai);color:var(--bubble-ai-text);border-radius:4px 12px 12px 12px;border:1px solid var(--bubble-ai-border)'}`;
+      bubble.innerHTML=isUser?esc(text):fmtMd(text);
+      div.appendChild(bubble);container.appendChild(div);
+    });
+  }catch(e){
+    document.getElementById('share-view-messages').innerHTML='<p style="color:#f87171;text-align:center;margin-top:40px">❌ Erreur de chargement : '+e.message+'</p>';
+  }
+  return true;
+}
+
 // ── EXPORT / IMPORT ──
 function exportConvs(){
   const blob=new Blob([JSON.stringify(convs,null,2)],{type:'application/json'});
@@ -1757,7 +1905,11 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{})});
 }
  
-load();
+if(supa){
+  checkAndRenderShare().then(isShare=>{if(!isShare)load();});
+} else {
+  load();
+}
 </script>
 </body>
 </html>
