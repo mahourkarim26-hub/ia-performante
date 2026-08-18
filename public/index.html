@@ -68,7 +68,22 @@
     #sidebar-list{flex:1;overflow-y:auto;padding:5px}
     #sidebar-list::-webkit-scrollbar{width:3px}
     #sidebar-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-    .group-label{font-size:8.5px;color:var(--text4);text-transform:uppercase;letter-spacing:1.2px;padding:8px 8px 4px;font-weight:600;font-family:'JetBrains Mono',monospace}
+    .group-label{font-size:8.5px;color:var(--text4);text-transform:uppercase;letter-spacing:1.2px;padding:8px 8px 4px;font-weight:600;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:space-between}
+    .group-label-add{background:none;border:none;color:var(--text4);cursor:pointer;font-size:13px;padding:0 4px;line-height:1;transition:color .15s}
+    .group-label-add:hover{color:var(--accent3)}
+    .folder-item{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:10.5px;color:var(--text3);transition:all .15s;margin-bottom:1px;border:1px solid transparent}
+    .folder-item:hover{background:var(--surface2);color:var(--text);border-color:var(--border)}
+    .folder-item.active-folder{background:rgba(74,222,128,0.06);border-color:var(--border);color:var(--text2)}
+    .folder-delete{background:none;border:none;color:rgba(248,113,113,0.4);cursor:pointer;font-size:11px;padding:0 2px;opacity:0;transition:opacity .15s}
+    .folder-item:hover .folder-delete{opacity:1}
+    .folder-delete:hover{color:#f87171}
+    /* Quota banner */
+    #quota-bar{padding:6px 14px;background:rgba(251,146,60,0.08);border-bottom:1px solid rgba(251,146,60,0.2);font-size:10px;color:#fb923c;font-family:'JetBrains Mono',monospace;display:none;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
+    #quota-bar.visible{display:flex}
+    #quota-progress-wrap{flex:1;height:3px;background:rgba(251,146,60,0.15);border-radius:3px;overflow:hidden;max-width:80px}
+    #quota-progress-fill{height:100%;background:#fb923c;border-radius:3px;transition:width .3s}
+    #quota-bar.danger{background:rgba(248,113,113,0.08);border-color:rgba(248,113,113,0.2);color:#f87171}
+    #quota-bar.danger #quota-progress-fill{background:#f87171}
     .conv-item{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:7px;cursor:pointer;transition:all .15s;margin-bottom:1px;border:1px solid transparent}
     .conv-item:hover{background:var(--surface2);border-color:var(--border)}
     .conv-item.active{background:rgba(74,222,128,0.08);border-color:var(--border2)}
@@ -384,9 +399,15 @@
         </svg>
         Nouvelle conversation
       </button>
+      <button onclick="createFolder()" style="width:100%;margin-top:5px;padding:6px 11px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text3);font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+        📁 Nouveau dossier
+      </button>
     </div>
     <div id="search-wrap">
       <input type="text" id="search-input" placeholder="🔍 Rechercher…" oninput="renderSidebar()"/>
+    </div>
+    <div id="folders-section" style="padding:4px 5px 0;border-bottom:1px solid var(--border)">
+      <div id="folders-list"></div>
     </div>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
@@ -447,6 +468,13 @@
       </div>
     </div>
  
+    <!-- Quota bar -->
+    <div id="quota-bar">
+      <span id="quota-label">0/30 messages aujourd'hui</span>
+      <div id="quota-progress-wrap"><div id="quota-progress-fill" style="width:0%"></div></div>
+      <button onclick="openAuthModal()" style="background:none;border:1px solid currentColor;border-radius:5px;color:inherit;cursor:pointer;padding:2px 7px;font-size:9px;font-family:'Space Grotesk',sans-serif;white-space:nowrap">Se connecter</button>
+    </div>
+
     <!-- Pinned message bar -->
     <div id="pinned-bar">
       <span class="pin-icon">📌</span>
@@ -715,10 +743,13 @@ const SUPABASE_ANON_KEY = 'sb_publishable_dJ0J0aaN8igcqGg6OyxuMw_dMjK81KH';
 const supa = (SUPABASE_URL.includes('TON-PROJET') || !window.supabase) ? null : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
  
-const CONVS_KEY='ia_convs_v8',CUR_KEY='ia_cur_v8',SETTINGS_KEY='ia_settings_v4';
+const CONVS_KEY='ia_convs_v8',CUR_KEY='ia_cur_v8',SETTINGS_KEY='ia_settings_v4',FOLDERS_KEY='ia_folders_v1',QUOTA_KEY='ia_quota_v1';
 let convs={},currentId=null,loading=false,pendingFiles=[];
 let settings={systemPrompt:'',fontSize:13,theme:'dark'};
 let currentModel='openai/gpt-oss-120b';
+let folders={};       // {id: {id, name, icon}}
+let currentFolder=null; // null = toutes les convs
+const DAILY_QUOTA=30; // messages/jour pour les non-connectés
 let lastAssistantRow=null,currentReader=null,currentTTS=null;
 let pinnedMsg=null;
 let currentLightboxUrl='';
@@ -1029,9 +1060,11 @@ function load(){
   loadSettings();
   try{convs=JSON.parse(localStorage.getItem(CONVS_KEY)||'{}')}catch(e){convs={}}
   currentId=localStorage.getItem(CUR_KEY)||null;
+  loadFolders();
   renderSidebar();
   if(currentId&&convs[currentId])loadConv(currentId);
   updateAccountUI();
+  updateQuotaBar();
 }
 let storageWarnShown=false;
 function checkStorageQuota(jsonStr){
@@ -1131,6 +1164,7 @@ if(supa){
   supa.auth.onAuthStateChange((event,session)=>{
     currentUser=session?.user||null;
     updateAccountUI();
+    updateQuotaBar();
     if(event==='SIGNED_IN'){closeAuthModal();syncFromCloud();}
     if(event==='SIGNED_OUT'){renderSidebar()}
   });
@@ -1375,6 +1409,107 @@ function buildApiMessages(storedMessages){
 }
  
 // ── SIDEBAR ──
+// ── DOSSIERS ──
+function loadFolders(){
+  try{folders=JSON.parse(localStorage.getItem(FOLDERS_KEY)||'{}')}catch(e){folders={}}
+  renderFolders();
+}
+function saveFolders(){localStorage.setItem(FOLDERS_KEY,JSON.stringify(folders))}
+const FOLDER_ICONS=['📁','📂','💼','🎨','💻','📚','🎯','🔬','✍️','🚀'];
+function createFolder(){
+  const name=prompt('Nom du dossier :','Nouveau dossier');
+  if(!name||!name.trim())return;
+  const id='f'+Date.now();
+  const icon=FOLDER_ICONS[Math.floor(Math.random()*FOLDER_ICONS.length)];
+  folders[id]={id,name:name.trim(),icon};
+  saveFolders();renderFolders();toast('Dossier créé : '+name.trim());
+}
+function deleteFolder(id,e){
+  e.stopPropagation();
+  if(!confirm('Supprimer ce dossier ? Les conversations ne seront pas supprimées.'))return;
+  delete folders[id];
+  // Retirer le dossier de toutes les convs qui l'utilisaient
+  Object.values(convs).forEach(c=>{if(c.folder===id)delete c.folder});
+  if(currentFolder===id){currentFolder=null}
+  saveFolders();save();renderFolders();renderSidebar();
+}
+function setCurrentFolder(id){
+  currentFolder=currentFolder===id?null:id;
+  renderFolders();renderSidebar();
+}
+function renderFolders(){
+  const el=document.getElementById('folders-list');
+  if(!el)return;
+  const list=Object.values(folders);
+  if(!list.length){el.innerHTML='';document.getElementById('folders-section').style.display='none';return}
+  document.getElementById('folders-section').style.display='block';
+  el.innerHTML='';
+  const header=document.createElement('div');
+  header.className='group-label';
+  header.innerHTML=`<span>Dossiers</span><button class="group-label-add" onclick="createFolder()" title="Nouveau dossier">＋</button>`;
+  el.appendChild(header);
+  const allBtn=document.createElement('div');
+  allBtn.className='folder-item'+(currentFolder===null?' active-folder':'');
+  allBtn.innerHTML=`<span>📋</span><span style="flex:1">Toutes les conversations</span>`;
+  allBtn.onclick=()=>setCurrentFolder(null);
+  el.appendChild(allBtn);
+  list.forEach(f=>{
+    const count=Object.values(convs).filter(c=>c.folder===f.id).length;
+    const item=document.createElement('div');
+    item.className='folder-item'+(currentFolder===f.id?' active-folder':'');
+    item.innerHTML=`<span>${f.icon}</span><span style="flex:1">${esc(f.name)}</span><span style="font-size:9px;color:var(--text4)">${count}</span><button class="folder-delete" onclick="deleteFolder('${f.id}',event)" title="Supprimer">✕</button>`;
+    item.onclick=e=>{if(!e.target.closest('.folder-delete'))setCurrentFolder(f.id)};
+    el.appendChild(item);
+  });
+  // Bouton ajouter dossier si pas de dossiers
+  el.style.paddingBottom='4px';
+}
+function moveConvToFolder(id,e){
+  e.stopPropagation();
+  const folderList=Object.values(folders);
+  if(!folderList.length){toast('Crée d\'abord un dossier (bouton ＋ dans la sidebar)');return}
+  const current=convs[id]?.folder;
+  const options=['Aucun dossier',...folderList.map(f=>f.icon+' '+f.name)];
+  const choice=prompt('Déplacer vers :\n'+options.map((o,i)=>`${i}. ${o}`).join('\n')+'\n\nEntre le numéro :');
+  if(choice===null)return;
+  const idx=parseInt(choice);
+  if(isNaN(idx)||idx<0||idx>folderList.length)return;
+  if(idx===0)delete convs[id].folder;
+  else convs[id].folder=folderList[idx-1].id;
+  save();renderFolders();renderSidebar();toast('Déplacé ✓');
+}
+
+// ── QUOTAS (non-connectés : 30 msg/jour) ──
+function getQuotaData(){
+  const today=new Date().toDateString();
+  try{
+    const d=JSON.parse(localStorage.getItem(QUOTA_KEY)||'{}');
+    if(d.date!==today)return{date:today,count:0};
+    return d;
+  }catch(e){return{date:today,count:0}}
+}
+function incrementQuota(){
+  if(currentUser)return; // pas de quota si connecté
+  const d=getQuotaData();d.count++;
+  localStorage.setItem(QUOTA_KEY,JSON.stringify(d));
+  updateQuotaBar();
+}
+function updateQuotaBar(){
+  const bar=document.getElementById('quota-bar');
+  if(!bar)return;
+  if(currentUser){bar.classList.remove('visible');return}
+  const d=getQuotaData();
+  const pct=Math.min(d.count/DAILY_QUOTA,1);
+  document.getElementById('quota-label').textContent=`${d.count}/${DAILY_QUOTA} messages aujourd'hui`;
+  document.getElementById('quota-progress-fill').style.width=(pct*100)+'%';
+  bar.classList.toggle('danger',d.count>=DAILY_QUOTA);
+  bar.classList.toggle('visible',d.count>0);
+}
+function isQuotaExceeded(){
+  if(currentUser)return false;
+  return getQuotaData().count>=DAILY_QUOTA;
+}
+
 function normalizeSearch(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
 function toggleFavorite(id,e){
   e.stopPropagation();
@@ -1387,8 +1522,10 @@ function renderSidebar(){
   const el=document.getElementById('sidebar-list');
   const query=normalizeSearch(document.getElementById('search-input')?.value||'').trim();
   let list=Object.values(convs).sort((a,b)=>b.date-a.date);
+  // Filtre par dossier actif
+  if(currentFolder!==null) list=list.filter(c=>c.folder===currentFolder);
   if(query)list=list.filter(c=>normalizeSearch(c.title).includes(query)||(c.messages||[]).some(m=>normalizeSearch(getDisplayText(m)).includes(query)));
-  if(!list.length){el.innerHTML='<div style="padding:18px 12px;text-align:center;font-size:10.5px;color:var(--text4);line-height:1.7;font-family:JetBrains Mono,monospace">'+(query?'// aucun résultat':'// aucune conversation<br>// commencez à écrire !')+'</div>';return}
+  if(!list.length){el.innerHTML='<div style="padding:18px 12px;text-align:center;font-size:10.5px;color:var(--text4);line-height:1.7;font-family:JetBrains Mono,monospace">'+(query?'// aucun résultat':currentFolder?'// dossier vide':'// aucune conversation<br>// commencez à écrire !')+'</div>';return}
   const favorites=list.filter(c=>c.favorite);
   const rest=list.filter(c=>!c.favorite);
   const today=new Date();today.setHours(0,0,0,0);
@@ -1420,6 +1557,7 @@ function renderSidebar(){
         </div>
         <div class="conv-actions">
           <button class="conv-action-btn" onclick="toggleFavorite('${c.id}',event)" title="${c.favorite?'Retirer des favoris':'Ajouter aux favoris'}">${c.favorite?'⭐':'☆'}</button>
+          <button class="conv-action-btn" onclick="moveConvToFolder('${c.id}',event)" title="Déplacer dans un dossier">📁</button>
           <button class="conv-action-btn" onclick="startRenameConv('${c.id}',event)" title="Renommer">✏️</button>
           <button class="conv-action-btn del" onclick="delConv('${c.id}',event)" title="Supprimer">🗑️</button>
         </div>`;
@@ -1776,6 +1914,7 @@ async function streamReply(apiMessages){
     const mid='m'+Date.now()+Math.random().toString(36).slice(2,6);row.dataset.mid=mid;
     const c=convs[currentId];
     if(c){c.messages.push({id:mid,role:'assistant',content:fullText,displayContent:fullText,ts:Date.now(),chips:[]});c.date=Date.now();save();renderSidebar();updateTokenDisplay();updateCtxBar()}
+    incrementQuota();updateQuotaBar();
     return fullText;
   }catch(e){
     rmTyping();currentReader=null;
@@ -1847,6 +1986,11 @@ async function send(){
   if(!text&&!files.length)return;
   if(files.some(f=>f.loading)){toast('Lecture des fichiers en cours…');return}
   if(loading){stopGeneration();await new Promise(r=>setTimeout(r,80))}
+  // Vérifier quota
+  if(isQuotaExceeded()){
+    toast('⚠️ Limite de '+DAILY_QUOTA+' messages/jour atteinte — connecte-toi pour continuer',4000);
+    openAuthModal();return;
+  }
  
   const firstMsg=text||(files[0]?.name||'Fichier');
   getOrCreate(firstMsg);
