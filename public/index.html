@@ -20,6 +20,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljs-theme">
   <style>
     :root[data-theme="dark"]{
@@ -389,6 +390,9 @@
     </div>
     <div id="sidebar-list"></div>
     <div id="sidebar-footer">
+      <div class="footer-row" style="cursor:pointer" onclick="openAuthModal()" title="Connexion / synchronisation">
+        <span id="account-status">👤 Invité (local uniquement)</span>
+      </div>
       <div class="footer-row">
         <div style="display:flex;align-items:center;gap:5px"><div class="status-dot"></div><span id="model-label">GPT-OSS 120B</span></div>
         <span id="conv-count">0 convs</span>
@@ -627,6 +631,20 @@
   <div class="shortcut-row"><span class="shortcut-desc">Raccourcis clavier</span><span class="shortcut-key">Ctrl + /</span></div>
 </div>
  
+<!-- Auth modal (Supabase) -->
+<div id="auth-backdrop" onclick="closeAuthModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:198;backdrop-filter:blur(4px)"></div>
+<div id="auth-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:14px;padding:20px;width:min(360px,90vw);z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+  <div class="settings-title">☁️ Synchronisation<button class="settings-close" onclick="closeAuthModal()">×</button></div>
+  <div id="auth-step-email">
+    <p style="font-size:11.5px;color:var(--text3);margin-bottom:10px;line-height:1.6">Connecte-toi pour retrouver tes conversations sur tous tes appareils. Pas de mot de passe : un lien de connexion te sera envoyé par email.</p>
+    <input type="email" id="auth-email-input" placeholder="ton@email.com" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;font-family:'Space Grotesk',sans-serif;outline:none;margin-bottom:10px"/>
+    <button class="settings-btn" style="width:100%" onclick="sendMagicLink()">Recevoir le lien de connexion</button>
+  </div>
+  <div id="auth-step-sent" style="display:none">
+    <p style="font-size:11.5px;color:var(--text2);line-height:1.6">✅ Vérifie ta boîte mail et clique sur le lien pour te connecter (regarde aussi les spams).</p>
+  </div>
+</div>
+ 
 <div id="confirm-backdrop"></div>
 <div id="confirm-dialog">
   <div class="confirm-title">Supprimer la conversation ?</div>
@@ -649,6 +667,17 @@
  
 <script>
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+ 
+// ══════════════════════════════════════════════════════════════════════
+// CONFIG SUPABASE — remplace ces 2 valeurs par celles de TON projet
+// (Supabase → Project Settings → API → "Project URL" et "anon public" key).
+// Ces valeurs sont publiques par design (Supabase protège les données via
+// les règles RLS côté serveur, pas en cachant cette clé).
+// ══════════════════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://sfbjyduzziwhnsvcwesp.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_dJ0J0aaN8igcqGg6OyxuMw_dMjK81KH';
+const supa = (SUPABASE_URL.includes('TON-PROJET') || !window.supabase) ? null : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
  
 const CONVS_KEY='ia_convs_v8',CUR_KEY='ia_cur_v8',SETTINGS_KEY='ia_settings_v4';
 let convs={},currentId=null,loading=false,pendingFiles=[];
@@ -966,6 +995,7 @@ function load(){
   currentId=localStorage.getItem(CUR_KEY)||null;
   renderSidebar();
   if(currentId&&convs[currentId])loadConv(currentId);
+  updateAccountUI();
 }
 let storageWarnShown=false;
 function checkStorageQuota(jsonStr){
@@ -985,6 +1015,89 @@ function save(){
     console.warn('localStorage plein',e);
     toast('❌ Stockage plein — exporte puis supprime de vieilles conversations',5000);
   }
+  if(currentUser&&currentId)pushConvToCloud(currentId);
+}
+ 
+// ── SUPABASE : AUTH & SYNCHRONISATION (gratuit, optionnel) ──
+function openAuthModal(){
+  if(currentUser){
+    openConfirm(()=>{signOutUser()});
+    document.querySelector('.confirm-title').textContent='Se déconnecter ?';
+    document.querySelector('.confirm-sub').textContent=currentUser.email+' — tes conversations resteront disponibles hors-ligne sur cet appareil.';
+    return;
+  }
+  if(!supa){toast('Synchronisation non configurée pour l\'instant');return}
+  document.getElementById('auth-step-email').style.display='block';
+  document.getElementById('auth-step-sent').style.display='none';
+  document.getElementById('auth-modal').style.display='block';
+  document.getElementById('auth-backdrop').style.display='block';
+}
+function closeAuthModal(){
+  document.getElementById('auth-modal').style.display='none';
+  document.getElementById('auth-backdrop').style.display='none';
+}
+async function sendMagicLink(){
+  if(!supa){toast('Synchronisation non configurée');return}
+  const email=document.getElementById('auth-email-input').value.trim();
+  if(!email||!email.includes('@')){toast('Email invalide');return}
+  const btn=event?.target;
+  const{error}=await supa.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});
+  if(error){toast('Erreur : '+error.message);return}
+  document.getElementById('auth-step-email').style.display='none';
+  document.getElementById('auth-step-sent').style.display='block';
+}
+async function signOutUser(){
+  if(!supa)return;
+  await supa.auth.signOut();
+  toast('Déconnecté — mode local');
+}
+function updateAccountUI(){
+  const el=document.getElementById('account-status');
+  if(!el)return;
+  el.textContent=currentUser?('☁️ '+currentUser.email):'👤 Invité (local uniquement)';
+}
+async function syncFromCloud(){
+  if(!supa||!currentUser)return;
+  try{
+    const{data,error}=await supa.from('conversations').select('*').eq('user_id',currentUser.id);
+    if(error){toast('Erreur de synchronisation : '+error.message);return}
+    const cloudConvs={};
+    (data||[]).forEach(row=>{
+      cloudConvs[row.id]={id:row.id,title:row.title,messages:row.messages||[],date:row.date,favorite:!!row.favorite};
+    });
+    convs=cloudConvs;
+    localStorage.setItem(CONVS_KEY,JSON.stringify(convs));
+    renderSidebar();
+    if(currentId&&convs[currentId])loadConv(currentId);else newChat();
+    toast('☁️ Conversations synchronisées');
+  }catch(e){toast('Erreur de synchronisation')}
+}
+async function pushConvToCloud(id){
+  if(!supa||!currentUser)return;
+  const c=convs[id];if(!c)return;
+  try{
+    await supa.from('conversations').upsert({
+      id:c.id,user_id:currentUser.id,title:c.title,messages:c.messages,
+      favorite:!!c.favorite,date:c.date,updated_at:new Date().toISOString()
+    });
+  }catch(e){console.warn('Erreur synchro cloud',e)}
+}
+async function deleteConvFromCloud(id){
+  if(!supa||!currentUser)return;
+  try{await supa.from('conversations').delete().eq('id',id).eq('user_id',currentUser.id)}catch(e){}
+}
+if(supa){
+  supa.auth.getSession().then(({data})=>{
+    currentUser=data?.session?.user||null;
+    updateAccountUI();
+    if(currentUser)syncFromCloud();
+  });
+  supa.auth.onAuthStateChange((event,session)=>{
+    currentUser=session?.user||null;
+    updateAccountUI();
+    if(event==='SIGNED_IN'){closeAuthModal();syncFromCloud();}
+    if(event==='SIGNED_OUT'){renderSidebar()}
+  });
 }
  
 // ── EXPORT / IMPORT ──
@@ -1198,7 +1311,7 @@ function loadConv(id){
 }
 function delConv(id,e){
   e.stopPropagation();
-  openConfirm(()=>{delete convs[id];if(currentId===id)newChat();save();renderSidebar();toast('Supprimé')});
+  openConfirm(()=>{delete convs[id];if(currentId===id)newChat();save();renderSidebar();deleteConvFromCloud(id);toast('Supprimé')});
 }
 function getOrCreate(firstMsg){
   if(!currentId||!convs[currentId]){
