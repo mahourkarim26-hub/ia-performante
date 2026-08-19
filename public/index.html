@@ -452,6 +452,24 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes shimmer{0%,100%{opacity:.4}50%{opacity:1}}
     .pulse-anim{animation:statusPulse 2s ease-in-out infinite}
+
+    /* ═══════════ ONBOARDING (tour guidé première visite) ═══════════ */
+    #onboarding-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:250;pointer-events:none}
+    #onboarding-overlay.open{display:block}
+    .onboarding-target{position:relative;z-index:251;box-shadow:0 0 0 4px rgba(74,222,128,0.35),0 0 0 8px rgba(74,222,128,0.15);border-radius:8px;transition:box-shadow .2s}
+    #onboarding-tooltip{display:none;position:fixed;z-index:252;background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:12px;padding:14px 16px;width:270px;box-shadow:0 16px 44px rgba(0,0,0,0.5);pointer-events:auto}
+    #onboarding-tooltip.open{display:block;animation:fadeUp .25s ease forwards}
+    .ob-step-count{font-size:9px;color:var(--text4);font-family:'JetBrains Mono',monospace;letter-spacing:1px;margin-bottom:5px}
+    .ob-title{font-family:'Syne',sans-serif;font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:5px}
+    .ob-text{font-size:11.5px;color:var(--text3);line-height:1.6;margin-bottom:12px}
+    .ob-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .ob-skip{background:none;border:none;color:var(--text4);font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;padding:4px 2px}
+    .ob-skip:hover{color:var(--text3)}
+    .ob-next{padding:6px 14px;background:linear-gradient(135deg,var(--accent2),var(--accent));border:none;border-radius:7px;color:#fff;font-size:11px;font-family:'Space Grotesk',sans-serif;font-weight:600;cursor:pointer;transition:all .2s}
+    .ob-next:hover{opacity:.9}
+    @media(max-width:640px){
+      #onboarding-tooltip{width:min(260px,84vw)}
+    }
   </style>
 </head>
 <body>
@@ -563,7 +581,7 @@
         </svg>
         Nouvelle conversation
       </button>
-      <button onclick="createFolder()" style="width:100%;margin-top:5px;padding:6px 11px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text3);font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+      <button id="new-folder-btn" onclick="createFolder()" style="width:100%;margin-top:5px;padding:6px 11px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text3);font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
         📁 Nouveau dossier
       </button>
     </div>
@@ -905,6 +923,18 @@
   <div id="lightbox-actions" onclick="event.stopPropagation()">
     <button id="lightbox-dl" onclick="downloadLightboxImg()">💾 Télécharger</button>
     <button id="lightbox-close" onclick="closeLightbox()">✕ Fermer</button>
+  </div>
+</div>
+
+<!-- Onboarding : tour guidé première visite -->
+<div id="onboarding-overlay"></div>
+<div id="onboarding-tooltip">
+  <div class="ob-step-count" id="ob-step-count"></div>
+  <div class="ob-title" id="ob-title"></div>
+  <div class="ob-text" id="ob-text"></div>
+  <div class="ob-actions">
+    <button class="ob-skip" onclick="skipOnboarding()">Passer</button>
+    <button class="ob-next" id="ob-next-btn" onclick="nextOnboardingStep()">Suivant →</button>
   </div>
 </div>
  
@@ -1511,7 +1541,7 @@ function startRename(){
 function finishRename(){
   const ri=document.getElementById('rename-input');const val=ri.value.trim();
   if(val&&currentId&&convs[currentId]){convs[currentId].title=val;chatTitleEl.textContent=val;save();renderSidebar()}
-  ri.style.display='none';chatTitleEl.style.display='';
+  ri.style.display='none';chatTitleEl.style.display=''
 }
 function cancelRename(){document.getElementById('rename-input').style.display='none';chatTitleEl.style.display=''}
  
@@ -2349,6 +2379,7 @@ function dismissLanding(){
   document.getElementById('landing-page').classList.remove('visible');
   document.getElementById('app').style.display='flex';
   ta.focus();
+  maybeStartOnboarding();
 }
 function maybeShowLanding(){
   if(!shouldShowLanding())return;
@@ -2368,14 +2399,118 @@ function initLandingAnimations(){
   els.forEach(el=>io.observe(el));
 }
 
+// ── ONBOARDING : tour guidé première visite ────────────────────────────
+// Objectif : les gens qui arrivent via "Essayer gratuitement" depuis la
+// landing atterrissent dans une interface complète (dossiers, recherche
+// web, générateur d'images...) sans qu'on la leur ait présentée. 4 bulles
+// pointent successivement vers les fonctionnalités faciles à louper.
+const ONBOARDING_SEEN_KEY='ia_onboarding_seen_v1';
+let obStep=0;
+const ONBOARDING_STEPS=[
+  {
+    target:'#ta',
+    placement:'top',
+    title:'💬 Pose tes questions ici',
+    text:'Écris, colle une image ou joins un PDF — l\'IA bascule automatiquement en mode vision dès qu\'une image est détectée.'
+  },
+  {
+    target:'#img-toggle-btn',
+    placement:'top',
+    title:'🎨 Génère des images',
+    text:'Décris ce que tu veux voir, choisis un style et une taille, et l\'image apparaît directement dans la conversation.'
+  },
+  {
+    target:'#web-search-btn',
+    placement:'top',
+    title:'🌐 Recherche web',
+    text:'Active-la pour des réponses à jour avec sources citées — utile pour tout ce qui date d\'après l\'entraînement du modèle.'
+  },
+  {
+    target:'#new-folder-btn',
+    placement:'bottom',
+    title:'📁 Organise avec des dossiers',
+    text:'Crée des dossiers pour ranger tes conversations par sujet. Tu peux aussi les marquer en favori ⭐ ou les exporter.',
+    beforeShow:()=>{
+      if(window.innerWidth<=640){
+        document.getElementById('sidebar').classList.add('open');
+        document.getElementById('overlay').classList.add('open');
+      }
+    }
+  }
+];
+function maybeStartOnboarding(){
+  if(localStorage.getItem(ONBOARDING_SEEN_KEY))return;
+  if(document.getElementById('landing-page').classList.contains('visible'))return;
+  if(document.getElementById('share-view').style.display==='block')return;
+  setTimeout(startOnboarding,400); // laisse le DOM se stabiliser (transition landing → app)
+}
+function startOnboarding(){
+  if(localStorage.getItem(ONBOARDING_SEEN_KEY))return;
+  localStorage.setItem(ONBOARDING_SEEN_KEY,'1');
+  obStep=0;
+  document.getElementById('onboarding-overlay').classList.add('open');
+  showOnboardingStep(0);
+}
+function clearOnboardingHighlight(){
+  document.querySelectorAll('.onboarding-target').forEach(el=>el.classList.remove('onboarding-target'));
+}
+function positionOnboardingTooltip(tip,rect,placement){
+  const margin=12;
+  let top,left;
+  if(placement==='top'){
+    top=rect.top-tip.offsetHeight-margin;
+    left=rect.left+rect.width/2-tip.offsetWidth/2;
+  } else {
+    top=rect.bottom+margin;
+    left=rect.left+rect.width/2-tip.offsetWidth/2;
+  }
+  left=Math.max(10,Math.min(left,window.innerWidth-tip.offsetWidth-10));
+  top=Math.max(10,Math.min(top,window.innerHeight-tip.offsetHeight-10));
+  tip.style.top=top+'px';tip.style.left=left+'px';
+}
+function showOnboardingStep(i){
+  clearOnboardingHighlight();
+  const step=ONBOARDING_STEPS[i];
+  if(!step){endOnboarding();return}
+  if(step.beforeShow)step.beforeShow();
+  requestAnimationFrame(()=>{
+    const target=document.querySelector(step.target);
+    if(!target){obStep++;showOnboardingStep(obStep);return} // cible absente (ex: écran étroit) → on saute l'étape
+    target.classList.add('onboarding-target');
+    const tip=document.getElementById('onboarding-tooltip');
+    tip.classList.add('open');
+    document.getElementById('ob-step-count').textContent=`${i+1}/${ONBOARDING_STEPS.length}`;
+    document.getElementById('ob-title').textContent=step.title;
+    document.getElementById('ob-text').textContent=step.text;
+    document.getElementById('ob-next-btn').textContent=i===ONBOARDING_STEPS.length-1?'Terminer ✓':'Suivant →';
+    const rect=target.getBoundingClientRect();
+    positionOnboardingTooltip(tip,rect,step.placement);
+    target.scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+}
+function nextOnboardingStep(){obStep++;showOnboardingStep(obStep)}
+function skipOnboarding(){endOnboarding()}
+function endOnboarding(){
+  clearOnboardingHighlight();
+  document.getElementById('onboarding-overlay').classList.remove('open');
+  document.getElementById('onboarding-tooltip').classList.remove('open');
+  if(window.innerWidth<=640)closeSidebar(); // referme la sidebar ouverte pour l'étape "dossiers"
+}
+window.addEventListener('resize',()=>{
+  if(!document.getElementById('onboarding-tooltip').classList.contains('open'))return;
+  const step=ONBOARDING_STEPS[obStep];if(!step)return;
+  const target=document.querySelector(step.target);if(!target)return;
+  positionOnboardingTooltip(document.getElementById('onboarding-tooltip'),target.getBoundingClientRect(),step.placement);
+});
+
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{})});
 }
  
 if(supa){
-  checkAndRenderShare().then(isShare=>{if(!isShare){load();maybeShowLanding();}});
+  checkAndRenderShare().then(isShare=>{if(!isShare){load();maybeShowLanding();if(!document.getElementById('landing-page').classList.contains('visible'))maybeStartOnboarding();}});
 } else {
-  load();maybeShowLanding();
+  load();maybeShowLanding();if(!document.getElementById('landing-page').classList.contains('visible'))maybeStartOnboarding();
 }
 </script>
 </body>
