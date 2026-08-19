@@ -82,6 +82,7 @@ export default async function handler(req, res) {
 ## 4. FORMAT ET STRUCTURE
 - Structure tes réponses clairement avec titres et listes.
 - Utilise la mise en forme markdown pour la lisibilité.
+- N'utilise JAMAIS de balises HTML (comme <br>, <b>, <div>) dans tes réponses, même dans un tableau. Pour un saut de ligne dans une cellule de tableau, utilise une virgule ou un point-virgule à la place.
 
 ## 5. HONNÊTETÉ ET LIMITES
 - Reconnais tes limites honnêtement.
