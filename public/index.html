@@ -1621,36 +1621,106 @@ function fileIcon(name,type){
 }
 function fmtSize(b){if(b<1024)return b+'o';if(b<1048576)return(b/1024).toFixed(0)+'Ko';return(b/1048576).toFixed(1)+'Mo'}
  
+// ── PDF : extraction par page (pour sélection de passages pertinents) ──
 async function extractPdfText(file){
   return new Promise(resolve=>{
     const reader=new FileReader();
     reader.onload=async e=>{
       try{
-        const pdf=await pdfjsLib.getDocument({data:e.target.result}).promise;let text='';
-        for(let i=1;i<=Math.min(pdf.numPages,20);i++){const page=await pdf.getPage(i);const content=await page.getTextContent();text+=content.items.map(s=>s.str).join(' ')+'\n'}
-        resolve(text.trim()||'[PDF sans texte extractible]');
-      }catch(err){resolve('[Erreur PDF: '+err.message+']')}
-    };reader.onerror=()=>resolve('[Erreur lecture]');reader.readAsArrayBuffer(file);
+        const pdf=await pdfjsLib.getDocument({data:e.target.result}).promise;
+        const MAX_PAGES=60; // au-delà, le rendu navigateur devient lent ; couvre la quasi-totalité des CV/lettres/rapports courants
+        const pageCount=Math.min(pdf.numPages,MAX_PAGES);
+        const pages=[];
+        for(let i=1;i<=pageCount;i++){
+          const page=await pdf.getPage(i);
+          const content=await page.getTextContent();
+          pages.push(content.items.map(s=>s.str).join(' ').trim());
+        }
+        resolve({pages,totalPages:pdf.numPages,truncatedPages:pdf.numPages>MAX_PAGES});
+      }catch(err){resolve({pages:['[Erreur PDF: '+err.message+']'],totalPages:0,truncatedPages:false})}
+    };reader.onerror=()=>resolve({pages:['[Erreur lecture]'],totalPages:0,truncatedPages:false});reader.readAsArrayBuffer(file);
   });
+}
+
+// ── PDF : sélection des passages les plus pertinents quand le document ne tient pas dans le budget de contexte ──
+// Plutôt que de tronquer bêtement au Nème caractère (perdant tout ce qui suit), on découpe le
+// document en chunks par page, on garde toujours le début et la fin, on priorise les chunks qui
+// recoupent des mots de la question posée, et on complète par un échantillonnage réparti sur tout
+// le document s'il reste de la place — pour donner une vue d'ensemble même sans question précise.
+const PDF_STOPWORDS=new Set(['le','la','les','de','des','du','un','une','et','à','en','que','qui','pour','dans','sur','par','est','sont','ce','cette','ces','au','aux','avec','ne','pas','plus','ou','se','son','sa','ses','leur','leurs','tu','je','il','elle','nous','vous','ils','elles','mais','donc','or','ni','car','comme','si','on','y','a','peux','peut','moi']);
+function buildPdfExcerpt(name,pages,truncatedPages,question){
+  const CHUNK_CHARS=1800,BUDGET=8000;
+  const chunks=[];
+  pages.forEach((pageText,pageIdx)=>{
+    for(let i=0;i<pageText.length;i+=CHUNK_CHARS){
+      const t=pageText.slice(i,i+CHUNK_CHARS).trim();
+      if(t)chunks.push({page:pageIdx+1,text:t});
+    }
+  });
+  if(!chunks.length)return`=== Fichier: ${name} ===\n[Aucun texte extractible dans ce PDF]\n=== Fin ===`;
+  const fullLength=chunks.reduce((s,c)=>s+c.text.length,0);
+  let selectedIdx;
+  if(fullLength<=BUDGET){
+    selectedIdx=chunks.map((_,i)=>i);
+  } else {
+    const queryWords=(question||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/\W+/).filter(w=>w.length>2&&!PDF_STOPWORDS.has(w));
+    const hasQuery=queryWords.length>0;
+    const scores=chunks.map(c=>{
+      if(!hasQuery)return 0;
+      const low=c.text.toLowerCase();
+      let s=0;for(const w of queryWords)if(low.includes(w))s++;
+      return s;
+    });
+    const picked=new Set([0,chunks.length-1]); // toujours le début et la fin du document
+    let used=chunks[0].text.length+(chunks.length>1?chunks[chunks.length-1].text.length:0);
+    if(hasQuery){
+      const order=chunks.map((_,i)=>i).filter(i=>!picked.has(i)).sort((a,b)=>scores[b]-scores[a]);
+      for(const i of order){
+        if(scores[i]<=0)break;
+        if(used+chunks[i].text.length>BUDGET)continue;
+        picked.add(i);used+=chunks[i].text.length;
+      }
+    }
+    if(used<BUDGET*0.9){ // vue d'ensemble : échantillonnage réparti sur tout le document avec le budget restant
+      const step=Math.max(1,Math.floor(chunks.length/6));
+      for(let i=0;i<chunks.length&&used<BUDGET;i+=step){
+        if(picked.has(i))continue;
+        picked.add(i);used+=chunks[i].text.length;
+      }
+    }
+    selectedIdx=[...picked].sort((a,b)=>a-b);
+  }
+  const body=selectedIdx.map(i=>`[page ${chunks[i].page}]\n${chunks[i].text}`).join('\n\n');
+  const note=fullLength>BUDGET
+    ?`\n(Document long — ${pages.length} page(s) lue(s)${truncatedPages?' (pages suivantes non lues)':''} ; extraits les plus pertinents sélectionnés ci-dessous, pas le texte intégral.)`
+    :'';
+  return`=== Fichier: ${name} ===${note}\n${body}\n=== Fin ===`;
 }
 async function extractText(file){return new Promise(resolve=>{const r=new FileReader();r.onload=e=>resolve(e.target.result||'');r.onerror=()=>resolve('[Erreur]');r.readAsText(file,'utf-8')})}
 async function readImageAsDataUrl(file){return new Promise(resolve=>{const r=new FileReader();r.onload=e=>resolve(e.target.result);r.onerror=()=>resolve(null);r.readAsDataURL(file)})}
- 
+
 async function handleFiles(fileList){
   const MAX=5,MAX_SIZE=10*1024*1024;
   for(const file of Array.from(fileList)){
     if(pendingFiles.length>=MAX){toast('Maximum 5 fichiers');break}
     if(file.size>MAX_SIZE){toast(file.name+' trop lourd (max 10Mo)');continue}
     const idx=pendingFiles.length;
-    pendingFiles.push({name:file.name,size:file.size,type:file.type,text:'',isImage:false,dataUrl:null,loading:true});
+    pendingFiles.push({name:file.name,size:file.size,type:file.type,text:'',isImage:false,dataUrl:null,loading:true,pdfPages:null,pdfTruncated:false});
     renderFilePreview();
     const isImg=file.type.startsWith('image/');
     const isPdf=file.name.endsWith('.pdf')||file.type==='application/pdf';
-    let text='',isImage=false,dataUrl=null;
+    let text='',isImage=false,dataUrl=null,pdfPages=null,pdfTruncated=false;
     if(isImg){isImage=true;dataUrl=await readImageAsDataUrl(file);text=`[Image: ${file.name}]`;toast('🖼️ Image → Qwen3.6 27B Vision')}
-    else if(isPdf){text=window.pdfjsLib?(await extractPdfText(file)).slice(0,6000):'[PDF.js non disponible]'}
+    else if(isPdf){
+      if(window.pdfjsLib){
+        const result=await extractPdfText(file);
+        pdfPages=result.pages;pdfTruncated=result.truncatedPages;
+        text=pdfPages.join(' ').slice(0,300);
+        toast('📄 PDF lu : '+pdfPages.length+' page(s)'+(pdfTruncated?' (document plus long, pages suivantes ignorées)':''));
+      } else { text='[PDF.js non disponible]'; }
+    }
     else{text=(await extractText(file)).slice(0,6000)}
-    pendingFiles[idx]={name:file.name,size:file.size,type:file.type,text,isImage,dataUrl,loading:false};
+    pendingFiles[idx]={name:file.name,size:file.size,type:file.type,text,isImage,dataUrl,loading:false,pdfPages,pdfTruncated};
     renderFilePreview();updateSendBtn();
   }
   document.getElementById('file-input').value='';
@@ -2539,6 +2609,7 @@ async function send(){
   const imageChips=chips.filter(c=>c.isImage&&c.dataUrl);
   const textFiles=files.filter(f=>!f.isImage);
   const fileParts=textFiles.map(f=>{
+    if(f.pdfPages)return buildPdfExcerpt(f.name,f.pdfPages,f.pdfTruncated,text);
     const txt=f.text.length>5000?f.text.slice(0,5000)+'\n…[tronqué]':f.text;
     return`=== Fichier: ${f.name} ===\n${txt}\n=== Fin ===`;
   });
