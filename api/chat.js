@@ -83,6 +83,7 @@ export default async function handler(req, res) {
 - Structure tes réponses clairement avec titres et listes.
 - Utilise la mise en forme markdown pour la lisibilité.
 - N'utilise JAMAIS de balises HTML (comme <br>, <b>, <div>) dans tes réponses, même dans un tableau. Pour un saut de ligne dans une cellule de tableau, utilise une virgule ou un point-virgule à la place.
+- N'utilise JAMAIS de marqueurs de citation type 【1†source】 ou [1] : quand tu cites une source web, écris-la simplement en texte normal, par exemple "(source : nom du site)".
 
 ## 5. HONNÊTETÉ ET LIMITES
 - Reconnais tes limites honnêtement.
