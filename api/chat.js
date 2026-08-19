@@ -4,6 +4,8 @@
 //    serverless reste "chaude" ; ce n'est pas parfait mais ça coûte 0€ et ça
 //    bloque déjà l'essentiel des abus/scripts).
 // 3) Validation basique de la taille de la requête pour éviter les factures Groq surprises.
+// 4) Cache + budget quotidien + rate limit dédié pour la recherche web Tavily
+//    (protège le quota gratuit de 1000 recherches/mois).
 
 const ALLOWED_ORIGINS = [
   'https://ia-performante.vercel.app',
@@ -46,6 +48,85 @@ function estimateContentLength(content) {
     }, 0);
   }
   return String(content || '').length;
+}
+
+// ── WEB SEARCH : cache + budget quotidien + rate limit dédié ──────────────
+// Objectif : le quota gratuit Tavily est de 1000 recherches/mois. Sans
+// protection, quelques utilisateurs actifs avec 🌐 activé peuvent le cramer
+// en quelques jours. Trois garde-fous, du moins au plus agressif :
+//
+//   1. Cache (1h) : deux personnes qui posent une question proche dans
+//      l'heure ne déclenchent qu'UN seul appel Tavily.
+//   2. Rate limit par IP (8 recherches web / 10 min) : empêche un seul
+//      utilisateur (ou script) de consommer le quota à lui seul.
+//   3. Budget quotidien global (30/jour ≈ 1000/mois avec marge) : filet de
+//      sécurité final si le cache et le rate limit par IP ne suffisent pas
+//      (beaucoup d'utilisateurs différents, requêtes toutes uniques).
+//
+// Tout est en mémoire (best-effort, reset à chaque cold start), donc gratuit
+// et sans dépendance — cohérent avec le reste du fichier.
+
+const WEB_SEARCH_CACHE_TTL_MS = 60 * 60 * 1000; // 1h : les résultats web ne périment pas plus vite que ça pour la plupart des requêtes
+const WEB_SEARCH_CACHE_MAX_ENTRIES = 500; // borne la mémoire utilisée par le cache
+const webSearchCache = globalThis.__iaWebSearchCache || (globalThis.__iaWebSearchCache = new Map());
+
+const WEB_SEARCH_IP_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const WEB_SEARCH_IP_MAX = 8; // 8 recherches web / 10 min / IP
+const webSearchIpBuckets = globalThis.__iaWebSearchIpBuckets || (globalThis.__iaWebSearchIpBuckets = new Map());
+
+const TAVILY_DAILY_BUDGET = 30; // ~1000/mois réparti sur 30 jours, avec marge de sécurité
+const tavilyBudget = globalThis.__iaTavilyBudget || (globalThis.__iaTavilyBudget = { date: null, count: 0 });
+
+function normalizeSearchQuery(q) {
+  return q.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 400);
+}
+
+function getCachedSearch(query) {
+  const entry = webSearchCache.get(query);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > WEB_SEARCH_CACHE_TTL_MS) {
+    webSearchCache.delete(query);
+    return null;
+  }
+  return entry.value;
+}
+
+function setCachedSearch(query, value) {
+  if (webSearchCache.size >= WEB_SEARCH_CACHE_MAX_ENTRIES) {
+    // Map conserve l'ordre d'insertion : on évince l'entrée la plus ancienne (FIFO simple).
+    const oldestKey = webSearchCache.keys().next().value;
+    webSearchCache.delete(oldestKey);
+  }
+  webSearchCache.set(query, { value, ts: Date.now() });
+}
+
+function isWebSearchIpLimited(ip) {
+  const now = Date.now();
+  const bucket = webSearchIpBuckets.get(ip);
+  if (!bucket || now - bucket.windowStart > WEB_SEARCH_IP_WINDOW_MS) {
+    webSearchIpBuckets.set(ip, { windowStart: now, count: 1 });
+    return false;
+  }
+  bucket.count += 1;
+  return bucket.count > WEB_SEARCH_IP_MAX;
+}
+
+function isTavilyBudgetExceeded() {
+  const today = new Date().toDateString();
+  if (tavilyBudget.date !== today) {
+    tavilyBudget.date = today;
+    tavilyBudget.count = 0;
+  }
+  return tavilyBudget.count >= TAVILY_DAILY_BUDGET;
+}
+
+function consumeTavilyBudget() {
+  const today = new Date().toDateString();
+  if (tavilyBudget.date !== today) {
+    tavilyBudget.date = today;
+    tavilyBudget.count = 0;
+  }
+  tavilyBudget.count += 1;
 }
 
 export default async function handler(req, res) {
@@ -152,32 +233,48 @@ export default async function handler(req, res) {
     // Recherche web (Tavily, gratuit jusqu'à 1000 recherches/mois) : si activée,
     // on cherche sur le web à partir du dernier message utilisateur et on injecte
     // les résultats dans le prompt système avant d'appeler Groq.
+    // Protégée par : cache (évite les doublons), rate limit par IP (évite qu'un
+    // seul utilisateur consomme tout le quota), budget quotidien global (filet
+    // de sécurité final).
     let webSearchResults = '';
     if (webSearchRequested && process.env.TAVILY_API_KEY) {
       try {
         const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-        const query = lastUserMsg
+        const rawQuery = lastUserMsg
           ? (Array.isArray(lastUserMsg.content)
               ? (lastUserMsg.content.find(p => p.type === 'text')?.text || '')
               : String(lastUserMsg.content || ''))
           : '';
-        if (query.trim()) {
-          const tavilyRes = await fetch('https://api.tavily.com/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              api_key: process.env.TAVILY_API_KEY,
-              query: query.slice(0, 400),
-              max_results: 5,
-              search_depth: 'basic'
-            })
-          });
-          if (tavilyRes.ok) {
-            const tavilyData = await tavilyRes.json();
-            const results = (tavilyData.results || []).slice(0, 5);
-            if (results.length) {
-              webSearchResults = '\n\n## RÉSULTATS DE RECHERCHE WEB (utilise-les pour répondre, cite tes sources) :\n' +
-                results.map((r, i) => `${i + 1}. ${r.title}\n${r.content?.slice(0, 500) || ''}\nSource: ${r.url}`).join('\n\n');
+        if (rawQuery.trim()) {
+          const normQuery = normalizeSearchQuery(rawQuery);
+          const cached = getCachedSearch(normQuery);
+
+          if (cached) {
+            webSearchResults = cached;
+          } else if (isWebSearchIpLimited(ip)) {
+            webSearchResults = '\n\n[Recherche web indisponible : trop de recherches en peu de temps depuis cette connexion. Réponds du mieux que tu peux sans web et signale-le brièvement à l\'utilisateur.]';
+          } else if (isTavilyBudgetExceeded()) {
+            webSearchResults = '\n\n[Recherche web temporairement indisponible : quota journalier atteint. Réponds du mieux que tu peux sans web et signale-le brièvement à l\'utilisateur.]';
+          } else {
+            consumeTavilyBudget();
+            const tavilyRes = await fetch('https://api.tavily.com/search', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                api_key: process.env.TAVILY_API_KEY,
+                query: normQuery,
+                max_results: 5,
+                search_depth: 'basic'
+              })
+            });
+            if (tavilyRes.ok) {
+              const tavilyData = await tavilyRes.json();
+              const results = (tavilyData.results || []).slice(0, 5);
+              if (results.length) {
+                webSearchResults = '\n\n## RÉSULTATS DE RECHERCHE WEB (utilise-les pour répondre, cite tes sources) :\n' +
+                  results.map((r, i) => `${i + 1}. ${r.title}\n${r.content?.slice(0, 500) || ''}\nSource: ${r.url}`).join('\n\n');
+                setCachedSearch(normQuery, webSearchResults);
+              }
             }
           }
         }
