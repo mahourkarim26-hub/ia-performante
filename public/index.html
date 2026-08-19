@@ -274,6 +274,25 @@
     #attach-btn svg{width:14px;height:14px}
     #img-toggle-btn{font-size:14px}
     #img-toggle-btn.active{background:rgba(74,222,128,0.12);border-color:var(--border2);color:var(--accent3)}
+    #web-search-btn{width:28px;height:28px;border-radius:7px;background:rgba(74,222,128,0.07);border:1px solid var(--border);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;font-size:14px}
+    #web-search-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+    #web-search-btn.active{background:rgba(59,130,246,0.12);border-color:rgba(59,130,246,0.4);color:#60a5fa}
+    /* Autocomplete slash-commandes */
+    #slash-menu{display:none;position:absolute;bottom:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;z-index:50;box-shadow:0 -4px 20px var(--shadow);margin-bottom:4px}
+    #slash-menu.open{display:block}
+    .slash-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;transition:background .12s;font-size:11.5px;color:var(--text2)}
+    .slash-item:hover,.slash-item.selected{background:var(--surface2)}
+    .slash-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+    .slash-desc{font-size:10px;color:var(--text4);margin-left:auto;font-family:'JetBrains Mono',monospace}
+    /* Bibliothèque de prompts */
+    #prompts-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:14px;padding:20px;width:min(500px,92vw);z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.5);max-height:80vh;overflow-y:auto}
+    #prompts-modal.open{display:block}
+    .prompt-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:6px;cursor:pointer;transition:all .15s;display:flex;align-items:flex-start;gap:8px}
+    .prompt-card:hover{background:var(--surface2);border-color:var(--border2);transform:translateY(-1px)}
+    .prompt-card-text{flex:1;min-width:0;font-size:11.5px;color:var(--text2);line-height:1.5;white-space:pre-wrap;word-break:break-word}
+    .prompt-card-del{background:none;border:none;color:rgba(248,113,113,0.4);cursor:pointer;font-size:13px;flex-shrink:0;padding:0 2px;line-height:1;transition:color .15s}
+    .prompt-card-del:hover{color:#f87171}
+    .web-search-indicator{display:inline-flex;align-items:center;gap:4px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:5px;padding:2px 7px;font-size:9px;color:#60a5fa;margin-top:4px;font-family:'JetBrains Mono',monospace}
     #file-input{display:none}
     #ta{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12.5px;line-height:1.6;font-family:'Space Grotesk',sans-serif;resize:none;max-height:120px;min-height:20px;overflow-y:auto}
     #ta::placeholder{color:var(--text4)}
@@ -585,10 +604,14 @@
           </svg>
         </button>
         <button id="img-toggle-btn" title="Générateur d'images" onclick="toggleImgPanel()">🎨</button>
+        <button id="web-search-btn" title="Recherche web (Tavily)" onclick="toggleWebSearch()">🌐</button>
         <input type="file" id="file-input" multiple
           accept=".txt,.md,.csv,.json,.js,.ts,.jsx,.tsx,.py,.html,.css,.xml,.yaml,.yml,.pdf,.jpg,.jpeg,.png,.gif,.webp,.svg"
           onchange="handleFiles(this.files)"/>
-        <textarea id="ta" rows="1" placeholder="Posez votre question, joignez une image…"></textarea>
+        <div style="flex:1;position:relative">
+          <div id="slash-menu"></div>
+          <textarea id="ta" rows="1" placeholder="Posez votre question, joignez une image…"></textarea>
+        </div>
         <button id="stop-btn" onclick="stopGeneration()" title="Arrêter">
           <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
         </button>
@@ -641,6 +664,7 @@
     <button class="settings-btn secondary" onclick="exportPDF()">🖨️ PDF</button>
     <button class="settings-btn secondary" onclick="generateTitle()">✨ Titre IA</button>
     <button class="settings-btn secondary" onclick="shareCurrentConv()">🔗 Partager</button>
+    <button class="settings-btn secondary" onclick="openPromptsModal()">📌 Mes prompts</button>
     <button class="settings-btn secondary" onclick="clearAllConvs()">🗑️ Tout effacer</button>
   </div>
 </div>
@@ -696,6 +720,18 @@
     <div id="share-view-messages"></div>
   </div>
 </div>
+
+<!-- Bibliothèque de prompts -->
+<div id="prompts-backdrop" onclick="closePromptsModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:198;backdrop-filter:blur(4px)"></div>
+<div id="prompts-modal">
+  <div class="settings-title">📌 Mes prompts favoris<button class="settings-close" onclick="closePromptsModal()">×</button></div>
+  <div style="display:flex;gap:6px;margin-bottom:12px">
+    <textarea id="new-prompt-input" placeholder="Colle ou écris un prompt à sauvegarder…" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:11.5px;font-family:'Space Grotesk',sans-serif;resize:none;min-height:56px;outline:none"></textarea>
+    <button class="settings-btn" onclick="saveNewPrompt()" style="align-self:flex-end">＋ Sauver</button>
+  </div>
+  <div id="prompts-list"></div>
+</div>
+
 <div id="auth-backdrop" onclick="closeAuthModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:198;backdrop-filter:blur(4px)"></div>
 <div id="auth-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:14px;padding:20px;width:min(360px,90vw);z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
   <div class="settings-title">☁️ Synchronisation<button class="settings-close" onclick="closeAuthModal()">×</button></div>
@@ -1061,6 +1097,7 @@ function load(){
   try{convs=JSON.parse(localStorage.getItem(CONVS_KEY)||'{}')}catch(e){convs={}}
   currentId=localStorage.getItem(CUR_KEY)||null;
   loadFolders();
+  loadPrompts();
   renderSidebar();
   if(currentId&&convs[currentId])loadConv(currentId);
   updateAccountUI();
@@ -1510,6 +1547,91 @@ function isQuotaExceeded(){
   return getQuotaData().count>=DAILY_QUOTA;
 }
 
+// ── RECHERCHE WEB (Tavily) ──
+let webSearchEnabled=false;
+function toggleWebSearch(){
+  webSearchEnabled=!webSearchEnabled;
+  document.getElementById('web-search-btn').classList.toggle('active',webSearchEnabled);
+  toast(webSearchEnabled?'🌐 Recherche web activée':'Recherche web désactivée');
+}
+
+// ── SLASH-COMMANDES ──
+const SLASH_COMMANDS=[
+  {cmd:'/image',icon:'🎨',label:'Générer une image',desc:'ouvre le générateur',action:()=>{ta.value='';ta.dispatchEvent(new Event('input'));toggleImgPanel()}},
+  {cmd:'/pdf',icon:'📄',label:'Exporter en PDF',desc:'conversation actuelle',action:()=>{ta.value='';ta.dispatchEvent(new Event('input'));exportPDF()}},
+  {cmd:'/code',icon:'💻',label:'Mode développeur',desc:'preset "Dev"',action:()=>{ta.value='';ta.dispatchEvent(new Event('input'));setPreset('code');document.getElementById('system-prompt-input').value=PRESETS.code;settings.systemPrompt=PRESETS.code;saveSettingsData();toast('Mode Dev activé ✓')}},
+  {cmd:'/traduis',icon:'🌍',label:'Traduire',desc:'insère un prompt',action:()=>{ta.value='Traduis ceci en anglais : ';ta.dispatchEvent(new Event('input'));ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}},
+  {cmd:'/resume',icon:'📝',label:'Résumer',desc:'insère un prompt',action:()=>{ta.value='Résume ce texte en 3 points clés : ';ta.dispatchEvent(new Event('input'));ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}},
+  {cmd:'/web',icon:'🌐',label:'Recherche web',desc:'active le web',action:()=>{ta.value='';ta.dispatchEvent(new Event('input'));if(!webSearchEnabled)toggleWebSearch()}},
+];
+let slashSelected=0;
+function updateSlashMenu(){
+  const menu=document.getElementById('slash-menu');
+  const val=ta.value;
+  if(!val.startsWith('/')||val.includes(' ')){menu.classList.remove('open');menu.innerHTML='';return}
+  const matches=SLASH_COMMANDS.filter(c=>c.cmd.startsWith(val.toLowerCase()));
+  if(!matches.length){menu.classList.remove('open');menu.innerHTML='';return}
+  slashSelected=Math.min(slashSelected,matches.length-1);
+  menu.innerHTML=matches.map((c,i)=>`<div class="slash-item${i===slashSelected?' selected':''}" data-idx="${i}" onclick="runSlashCommand(${i})"><span class="slash-icon">${c.icon}</span><span>${c.label}</span><span class="slash-desc">${c.desc}</span></div>`).join('');
+  menu.classList.add('open');
+  menu._matches=matches;
+}
+function runSlashCommand(idx){
+  const menu=document.getElementById('slash-menu');
+  const matches=menu._matches||[];
+  if(matches[idx])matches[idx].action();
+  menu.classList.remove('open');slashSelected=0;
+}
+
+// ── BIBLIOTHÈQUE DE PROMPTS ──
+const PROMPTS_KEY='ia_prompts_v1';
+let savedPrompts=[];
+function loadPrompts(){
+  try{savedPrompts=JSON.parse(localStorage.getItem(PROMPTS_KEY)||'[]')}catch(e){savedPrompts=[]}
+}
+function savePrompts(){localStorage.setItem(PROMPTS_KEY,JSON.stringify(savedPrompts))}
+function openPromptsModal(){
+  closeSettings();
+  document.getElementById('new-prompt-input').value=ta.value.trim();
+  renderPromptsList();
+  document.getElementById('prompts-modal').classList.add('open');
+  document.getElementById('prompts-backdrop').style.display='block';
+}
+function closePromptsModal(){
+  document.getElementById('prompts-modal').classList.remove('open');
+  document.getElementById('prompts-backdrop').style.display='none';
+}
+function saveNewPrompt(){
+  const val=document.getElementById('new-prompt-input').value.trim();
+  if(!val){toast('Écris ou colle un prompt d\'abord');return}
+  savedPrompts.unshift({id:'p'+Date.now(),text:val});
+  savePrompts();
+  document.getElementById('new-prompt-input').value='';
+  renderPromptsList();toast('Prompt sauvegardé ✓');
+}
+function usePrompt(id){
+  const p=savedPrompts.find(p=>p.id===id);
+  if(!p)return;
+  ta.value=p.text;ta.dispatchEvent(new Event('input'));ta.focus();
+  closePromptsModal();
+}
+function deletePrompt(id,e){
+  e.stopPropagation();
+  savedPrompts=savedPrompts.filter(p=>p.id!==id);
+  savePrompts();renderPromptsList();
+}
+function renderPromptsList(){
+  const el=document.getElementById('prompts-list');
+  if(!savedPrompts.length){el.innerHTML='<div style="text-align:center;padding:20px;font-size:11px;color:var(--text4);font-family:JetBrains Mono,monospace">// aucun prompt sauvegardé</div>';return}
+  el.innerHTML='';
+  savedPrompts.forEach(p=>{
+    const card=document.createElement('div');card.className='prompt-card';
+    card.onclick=()=>usePrompt(p.id);
+    card.innerHTML=`<span class="prompt-card-text">${esc(p.text)}</span><button class="prompt-card-del" onclick="deletePrompt('${p.id}',event)" title="Supprimer">✕</button>`;
+    el.appendChild(card);
+  });
+}
+
 function normalizeSearch(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
 function toggleFavorite(id,e){
   e.stopPropagation();
@@ -1873,7 +1995,7 @@ async function streamReply(apiMessages){
   try{
     const r=await fetch('/api/chat',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:apiMessages,model:currentModel,temperature:temp,systemPrompt:settings.systemPrompt||undefined,stream:true})
+      body:JSON.stringify({messages:apiMessages,model:currentModel,temperature:temp,systemPrompt:settings.systemPrompt||undefined,stream:true,webSearch:webSearchEnabled})
     });
     if(!r.ok){const err=await r.json().catch(()=>({}));throw new Error(err?.error?.message||'Erreur '+r.status)}
     rmTyping();
@@ -1887,6 +2009,12 @@ async function streamReply(apiMessages){
     const reader=r.body.getReader();currentReader=reader;
     const decoder=new TextDecoder();let fullText='',buffer='';
     const startTime=Date.now();
+    let renderPending=false;
+    function scheduleRender(){
+      if(renderPending)return;
+      renderPending=true;
+      setTimeout(()=>{b.innerHTML=fmtMd(fullText);msgEl.scrollTop=msgEl.scrollHeight;renderPending=false},50);
+    }
     while(true){
       const{done,value}=await reader.read();if(done)break;
       buffer+=decoder.decode(value,{stream:true});
@@ -1894,9 +2022,10 @@ async function streamReply(apiMessages){
       for(const line of lines){
         if(!line.startsWith('data:'))continue;
         const data=line.slice(5).trim();if(data==='[DONE]')break;
-        try{const parsed=JSON.parse(data);const delta=parsed.choices?.[0]?.delta?.content||'';if(delta){fullText+=delta;b.innerHTML=fmtMd(fullText);msgEl.scrollTop=msgEl.scrollHeight}}catch(e){}
+        try{const parsed=JSON.parse(data);const delta=parsed.choices?.[0]?.delta?.content||'';if(delta){fullText+=delta;scheduleRender()}}catch(e){}
       }
     }
+    b.innerHTML=fmtMd(fullText);msgEl.scrollTop=msgEl.scrollHeight;
     currentReader=null;
     // Word count + time badge
     const wc=fullText.split(/\s+/).filter(Boolean).length;
@@ -1957,8 +2086,19 @@ async function regenerate(){
 ta.addEventListener('input',()=>{
   ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,120)+'px';
   updateSendBtn();document.getElementById('char-count').textContent=ta.value.length>0?ta.value.length+' car':'';
+  updateSlashMenu();
 });
-ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!sb.disabled)send()}});
+ta.addEventListener('keydown',e=>{
+  const menu=document.getElementById('slash-menu');
+  if(menu.classList.contains('open')){
+    const matches=menu._matches||[];
+    if(e.key==='ArrowDown'){e.preventDefault();slashSelected=(slashSelected+1)%matches.length;updateSlashMenu();return}
+    if(e.key==='ArrowUp'){e.preventDefault();slashSelected=(slashSelected-1+matches.length)%matches.length;updateSlashMenu();return}
+    if(e.key==='Enter'){e.preventDefault();runSlashCommand(slashSelected);return}
+    if(e.key==='Escape'){menu.classList.remove('open');return}
+  }
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!sb.disabled)send()}
+});
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();newChat()}
   if((e.ctrlKey||e.metaKey)&&e.key==='r'&&!e.shiftKey){e.preventDefault();regenerate()}
