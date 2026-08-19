@@ -145,10 +145,48 @@ export default async function handler(req, res) {
     const model = hasImages ? VISION_MODEL : requestedModel;
     const temperature = req.body.temperature ?? 0.7;
     const stream = req.body.stream === true;
+    const webSearchRequested = req.body.webSearch === true;
+
+    // Recherche web (Tavily, gratuit jusqu'à 1000 recherches/mois) : si activée,
+    // on cherche sur le web à partir du dernier message utilisateur et on injecte
+    // les résultats dans le prompt système avant d'appeler Groq.
+    let webSearchResults = '';
+    if (webSearchRequested && process.env.TAVILY_API_KEY) {
+      try {
+        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+        const query = lastUserMsg
+          ? (Array.isArray(lastUserMsg.content)
+              ? (lastUserMsg.content.find(p => p.type === 'text')?.text || '')
+              : String(lastUserMsg.content || ''))
+          : '';
+        if (query.trim()) {
+          const tavilyRes = await fetch('https://api.tavily.com/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              api_key: process.env.TAVILY_API_KEY,
+              query: query.slice(0, 400),
+              max_results: 5,
+              search_depth: 'basic'
+            })
+          });
+          if (tavilyRes.ok) {
+            const tavilyData = await tavilyRes.json();
+            const results = (tavilyData.results || []).slice(0, 5);
+            if (results.length) {
+              webSearchResults = '\n\n## RÉSULTATS DE RECHERCHE WEB (utilise-les pour répondre, cite tes sources) :\n' +
+                results.map((r, i) => `${i + 1}. ${r.title}\n${r.content?.slice(0, 500) || ''}\nSource: ${r.url}`).join('\n\n');
+            }
+          }
+        }
+      } catch (e) {
+        // La recherche web échoue silencieusement : la conversation continue sans elle
+      }
+    }
 
     // Un vrai rôle "system" fonctionne aussi bien pour les modèles vision
     // sur l'API Groq (compatible OpenAI) — plus besoin du bricolage précédent.
-    const finalMessages = [{ role: 'system', content: SYSTEM }, ...messages];
+    const finalMessages = [{ role: 'system', content: SYSTEM + webSearchResults }, ...messages];
 
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -213,5 +251,5 @@ export const config = {
   api: {
     bodyParser: { sizeLimit: '20mb' },
     responseLimit: false,
-    },
+  },
 };
