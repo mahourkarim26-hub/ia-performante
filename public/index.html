@@ -1733,6 +1733,9 @@ function getOrCreate(firstMsg){
 // ── MARKDOWN ──
 function fmtMd(text){
   text=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Le modèle insère parfois du HTML brut (ex: <br>) au lieu de markdown pur —
+  // on convertit ces balises échappées en vrais sauts de ligne.
+  text=text.replace(/&lt;br\s*\/?&gt;/gi,'\n');
   text=text.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,lang,code)=>{
     const h=lang&&hljs.getLanguage(lang)?hljs.highlight(code.trim(),{language:lang}).value:hljs.highlightAuto(code.trim()).value;
     return`<pre style="position:relative"><button class="copy-code-btn" onclick="copyCode(this)">Copier</button><code class="hljs">${h}</code></pre>`;
