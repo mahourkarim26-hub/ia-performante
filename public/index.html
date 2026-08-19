@@ -470,9 +470,50 @@
     @media(max-width:640px){
       #onboarding-tooltip{width:min(260px,84vw)}
     }
+
+    /* ═══════════ SPLASH SCREEN (évite le flash de contenu non stylé) ═══════════ */
+    #splash-screen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity .35s ease}
+    #splash-screen.hide{opacity:0;pointer-events:none}
+    .splash-logo{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--accent2),var(--accent3));display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(74,222,128,0.3);animation:splashPulse 1.2s ease-in-out infinite}
+    .splash-logo svg{width:28px;height:28px}
+    @keyframes splashPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+
+    /* ═══════════ MODE COMPARAISON (2 modèles côte à côte) ═══════════ */
+    #compare-btn{width:28px;height:28px;border-radius:7px;background:rgba(74,222,128,0.07);border:1px solid var(--border);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;font-size:14px}
+    #compare-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+    #compare-btn.active{background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.4);color:#c084fc}
+    #compare-model-select{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:4px 7px;color:var(--text2);font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;outline:none}
+    .compare-row{display:flex;gap:10px;width:100%;max-width:100%;margin-bottom:10px}
+    .compare-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+    .compare-label{font-size:9px;color:var(--text4);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.5px}
+    .compare-col .bubble{max-width:100%}
+    .compare-keep{align-self:flex-start;background:rgba(74,222,128,0.1);border:1px solid var(--border2);color:var(--accent3);border-radius:6px;padding:4px 10px;font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:all .15s;display:none}
+    .compare-keep:hover{background:rgba(74,222,128,0.2)}
+    @media(max-width:640px){.compare-row{flex-direction:column}}
+
+    /* ═══════════ TEMPLATES DE DOCUMENTS ═══════════ */
+    .template-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .15s}
+    .template-card:hover{background:var(--surface2);border-color:var(--border2);transform:translateY(-1px)}
+    .template-card-icon{font-size:22px;flex-shrink:0}
+    .template-card-title{font-family:'Syne',sans-serif;font-size:12.5px;font-weight:700;color:var(--text)}
+    .template-card-desc{font-size:10.5px;color:var(--text4);margin-top:1px}
+    .template-field{margin-bottom:10px}
+    .template-field label{display:block;font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;font-family:'JetBrains Mono',monospace}
+    .template-field input,.template-field textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:11.5px;font-family:'Space Grotesk',sans-serif;outline:none;transition:border-color .2s}
+    .template-field input:focus,.template-field textarea:focus{border-color:var(--border2)}
+    .template-field textarea{min-height:70px;resize:vertical}
   </style>
 </head>
 <body>
+<!-- Splash screen (masque le flash de police/CSS non chargée) -->
+<div id="splash-screen">
+  <div class="splash-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+    </svg>
+  </div>
+</div>
+
 <!-- Landing page publique -->
 <div id="landing-page">
   <nav class="lp-nav">
@@ -584,6 +625,9 @@
       <button id="new-folder-btn" onclick="createFolder()" style="width:100%;margin-top:5px;padding:6px 11px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text3);font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
         📁 Nouveau dossier
       </button>
+      <button id="templates-btn" onclick="openTemplatesModal()" style="width:100%;margin-top:5px;padding:6px 11px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text3);font-size:10.5px;font-family:'Space Grotesk',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+        📄 Modèles de documents
+      </button>
     </div>
     <div id="search-wrap">
       <input type="text" id="search-input" placeholder="🔍 Rechercher…" oninput="renderSidebar()"/>
@@ -634,6 +678,12 @@
           <option value="openai/gpt-oss-20b">GPT-OSS 20B ⚡ (rapide)</option>
           <option value="qwen/qwen3.6-27b">Qwen3.6 27B 👁️ (vision)</option>
           <option value="gemma2-9b-it">Gemma2 9B (léger)</option>
+        </select>
+        <select id="compare-model-select" style="display:none" title="2e modèle à comparer">
+          <option value="openai/gpt-oss-20b">GPT-OSS 20B ⚡</option>
+          <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+          <option value="qwen/qwen3.6-27b">Qwen3.6 27B 👁️</option>
+          <option value="gemma2-9b-it">Gemma2 9B</option>
         </select>
         <div class="temp-wrap">
           <span class="temp-label">🌡 <span id="temp-val">0.7</span></span>
@@ -768,6 +818,7 @@
         </button>
         <button id="img-toggle-btn" title="Générateur d'images" onclick="toggleImgPanel()">🎨</button>
         <button id="web-search-btn" title="Recherche web (Tavily)" onclick="toggleWebSearch()">🌐</button>
+        <button id="compare-btn" title="Comparer 2 modèles" onclick="toggleCompare()">⚖️</button>
         <input type="file" id="file-input" multiple
           accept=".txt,.md,.csv,.json,.js,.ts,.jsx,.tsx,.py,.html,.css,.xml,.yaml,.yml,.pdf,.jpg,.jpeg,.png,.gif,.webp,.svg"
           onchange="handleFiles(this.files)"/>
@@ -923,6 +974,23 @@
   <div id="lightbox-actions" onclick="event.stopPropagation()">
     <button id="lightbox-dl" onclick="downloadLightboxImg()">💾 Télécharger</button>
     <button id="lightbox-close" onclick="closeLightbox()">✕ Fermer</button>
+  </div>
+</div>
+
+<!-- Templates de documents -->
+<div id="templates-backdrop" onclick="closeTemplatesModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:198;backdrop-filter:blur(4px)"></div>
+<div id="templates-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:14px;padding:20px;width:min(420px,92vw);z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.5);max-height:80vh;overflow-y:auto">
+  <div class="settings-title">📄 Modèles de documents<button class="settings-close" onclick="closeTemplatesModal()">×</button></div>
+  <div id="templates-list"></div>
+</div>
+
+<div id="template-form-backdrop" onclick="closeTemplateForm()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:198;backdrop-filter:blur(4px)"></div>
+<div id="template-form-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:14px;padding:20px;width:min(440px,92vw);z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.5);max-height:85vh;overflow-y:auto">
+  <div class="settings-title"><span id="template-form-title"></span><button class="settings-close" onclick="closeTemplateForm()">×</button></div>
+  <div id="template-form-fields"></div>
+  <div class="settings-row" style="margin-top:6px">
+    <button class="settings-btn" onclick="submitTemplateForm()">✨ Générer</button>
+    <button class="settings-btn secondary" onclick="closeTemplateForm()">Annuler</button>
   </div>
 </div>
 
@@ -1730,6 +1798,154 @@ function toggleWebSearch(){
   toast(webSearchEnabled?'🌐 Recherche web activée':'Recherche web désactivée');
 }
 
+// ── MODE COMPARAISON (2 modèles côte à côte) ──
+let compareEnabled=false;
+function toggleCompare(){
+  compareEnabled=!compareEnabled;
+  document.getElementById('compare-btn').classList.toggle('active',compareEnabled);
+  document.getElementById('compare-model-select').style.display=compareEnabled?'inline-block':'none';
+  toast(compareEnabled?'⚖️ Mode comparaison activé — 2 réponses seront générées':'Mode comparaison désactivé');
+}
+function modelLabel(model){
+  const labels={'openai/gpt-oss-120b':'GPT-OSS 120B','openai/gpt-oss-20b':'GPT-OSS 20B','qwen/qwen3.6-27b':'Qwen3.6 27B','gemma2-9b-it':'Gemma2 9B'};
+  return labels[model]||model;
+}
+async function streamCompare(apiMessages){
+  const modelA=currentModel;
+  const modelB=document.getElementById('compare-model-select').value;
+  const temp=parseFloat(document.getElementById('temp-slider').value)||0.7;
+
+  const row=document.createElement('div');row.className='row assistant compare-row';
+  function buildCol(model){
+    const wrap=document.createElement('div');wrap.className='compare-col';
+    const label=document.createElement('div');label.className='compare-label';label.textContent=modelLabel(model);
+    const b=document.createElement('div');b.className='bubble ai';b.innerHTML='<div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+    const keepBtn=document.createElement('button');keepBtn.className='compare-keep';keepBtn.textContent='✓ Garder celle-ci';
+    wrap.append(label,b,keepBtn);
+    return{wrap,b,keepBtn};
+  }
+  const colA=buildCol(modelA),colB=buildCol(modelB);
+  row.append(colA.wrap,colB.wrap);
+  msgEl.appendChild(row);msgEl.scrollTop=msgEl.scrollHeight;
+
+  async function runOne(model,target){
+    let fullText='';
+    try{
+      const r=await fetch('/api/chat',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({messages:apiMessages,model,temperature:temp,systemPrompt:settings.systemPrompt||undefined,stream:true,webSearch:webSearchEnabled})
+      });
+      if(!r.ok){const err=await r.json().catch(()=>({}));throw new Error(err?.error?.message||'Erreur '+r.status)}
+      const reader=r.body.getReader();const decoder=new TextDecoder();let buffer='';
+      while(true){
+        const{done,value}=await reader.read();if(done)break;
+        buffer+=decoder.decode(value,{stream:true});
+        const lines=buffer.split('\n');buffer=lines.pop()||'';
+        for(const line of lines){
+          if(!line.startsWith('data:'))continue;
+          const data=line.slice(5).trim();if(data==='[DONE]')break;
+          try{const parsed=JSON.parse(data);const delta=parsed.choices?.[0]?.delta?.content||'';if(delta){fullText+=delta;target.b.innerHTML=fmtMd(fullText);msgEl.scrollTop=msgEl.scrollHeight}}catch(e){}
+        }
+      }
+    }catch(e){
+      fullText=fullText||('❌ '+(e.message||'Erreur de génération'));
+    }
+    target.b.innerHTML=fmtMd(fullText);
+    target.keepBtn.style.display='inline-flex';
+    target.keepBtn.onclick=()=>keepCompareAnswer(row,fullText);
+    return fullText;
+  }
+  await Promise.all([runOne(modelA,colA),runOne(modelB,colB)]);
+  incrementQuota();updateQuotaBar();
+}
+function keepCompareAnswer(row,text){
+  const c=convs[currentId];if(!c)return;
+  const ts=Date.now();const mid='m'+ts+Math.random().toString(36).slice(2,6);
+  c.messages.push({id:mid,role:'assistant',content:text,displayContent:text,ts,chips:[]});
+  c.date=ts;save();renderSidebar();updateTokenDisplay();updateCtxBar();
+  row.remove();
+  lastAssistantRow=addMsgDOM('assistant',text,ts,[],mid);
+}
+
+// ── TEMPLATES DE DOCUMENTS ──
+const TEMPLATES=[
+  {id:'cv',icon:'📋',title:'CV',desc:'CV structuré à partir de ton profil',
+   fields:[
+     {key:'poste',label:'Poste visé',placeholder:'ex: Développeur web junior'},
+     {key:'parcours',label:'Formation / expérience',placeholder:'ex: BTS SIO, stage de 2 mois chez...',textarea:true},
+     {key:'competences',label:'Compétences clés',placeholder:'ex: HTML/CSS, JavaScript, travail en équipe'}
+   ],
+   build:v=>`Rédige un CV structuré et professionnel pour le poste de "${v.poste}". Formation et expérience : ${v.parcours}. Compétences clés : ${v.competences}. Organise-le en sections claires (profil, formation, expérience, compétences) et adapte le ton au poste visé.`
+  },
+  {id:'lettre',icon:'✉️',title:'Lettre de motivation',desc:'Lettre adaptée au poste et à l\'entreprise',
+   fields:[
+     {key:'poste',label:'Poste visé',placeholder:'ex: Alternant développeur'},
+     {key:'entreprise',label:'Entreprise',placeholder:'ex: Capgemini'},
+     {key:'motivation',label:'Pourquoi ce poste / cette entreprise',placeholder:'ex: intérêt pour le secteur, compétences en lien avec l\'offre...',textarea:true}
+   ],
+   build:v=>`Rédige une lettre de motivation professionnelle pour le poste de "${v.poste}" chez ${v.entreprise}. Éléments à intégrer : ${v.motivation}. Structure-la en 3-4 paragraphes (accroche, parcours/compétences, motivation, conclusion), ton formel mais engageant.`
+  },
+  {id:'linkedin',icon:'💼',title:'Post LinkedIn',desc:'Post prêt à publier sur un sujet donné',
+   fields:[
+     {key:'sujet',label:'Sujet du post',placeholder:'ex: fin de mon stage chez X'},
+     {key:'points',label:'Points à mentionner',placeholder:'ex: ce que j\'ai appris, un remerciement, une ouverture',textarea:true},
+     {key:'ton',label:'Ton souhaité (optionnel)',placeholder:'ex: professionnel et chaleureux'}
+   ],
+   build:v=>`Rédige un post LinkedIn sur : ${v.sujet}. Points à mentionner : ${v.points}. Ton souhaité : ${v.ton||'professionnel'}. Ajoute 2-3 hashtags pertinents à la fin, garde un format court et engageant (moins de 200 mots).`
+  }
+];
+let activeTemplate=null;
+function openTemplatesModal(){
+  const el=document.getElementById('templates-list');
+  el.innerHTML='';
+  TEMPLATES.forEach(t=>{
+    const card=document.createElement('div');card.className='template-card';
+    card.innerHTML=`<span class="template-card-icon">${t.icon}</span><div><div class="template-card-title">${esc(t.title)}</div><div class="template-card-desc">${esc(t.desc)}</div></div>`;
+    card.onclick=()=>openTemplateForm(t.id);
+    el.appendChild(card);
+  });
+  document.getElementById('templates-modal').style.display='block';
+  document.getElementById('templates-backdrop').style.display='block';
+}
+function closeTemplatesModal(){
+  document.getElementById('templates-modal').style.display='none';
+  document.getElementById('templates-backdrop').style.display='none';
+}
+function openTemplateForm(id){
+  activeTemplate=TEMPLATES.find(t=>t.id===id);if(!activeTemplate)return;
+  closeTemplatesModal();
+  document.getElementById('template-form-title').textContent=activeTemplate.icon+' '+activeTemplate.title;
+  const fieldsEl=document.getElementById('template-form-fields');
+  fieldsEl.innerHTML='';
+  activeTemplate.fields.forEach(f=>{
+    const wrap=document.createElement('div');wrap.className='template-field';
+    const label=document.createElement('label');label.textContent=f.label;
+    const input=document.createElement(f.textarea?'textarea':'input');
+    input.placeholder=f.placeholder||'';input.dataset.key=f.key;
+    if(!f.textarea)input.type='text';
+    wrap.append(label,input);fieldsEl.appendChild(wrap);
+  });
+  document.getElementById('template-form-modal').style.display='block';
+  document.getElementById('template-form-backdrop').style.display='block';
+  fieldsEl.querySelector('input,textarea')?.focus();
+}
+function closeTemplateForm(){
+  document.getElementById('template-form-modal').style.display='none';
+  document.getElementById('template-form-backdrop').style.display='none';
+  activeTemplate=null;
+}
+function submitTemplateForm(){
+  if(!activeTemplate)return;
+  const values={};
+  document.querySelectorAll('#template-form-fields [data-key]').forEach(el=>{values[el.dataset.key]=el.value.trim()});
+  const requiredMissing=activeTemplate.fields.some((f,i)=>i<2&&!values[f.key]); // les 2 premiers champs sont considérés essentiels
+  if(requiredMissing){toast('Remplis au moins les premiers champs');return}
+  const builtPrompt=activeTemplate.build(values);
+  closeTemplateForm();
+  ta.value=builtPrompt;ta.dispatchEvent(new Event('input'));
+  send();
+}
+
 // ── SLASH-COMMANDES ──
 const SLASH_COMMANDS=[
   {cmd:'/image',icon:'🎨',label:'Générer une image',desc:'ouvre le générateur',action:()=>{ta.value='';ta.dispatchEvent(new Event('input'));toggleImgPanel()}},
@@ -2339,7 +2555,8 @@ async function send(){
  
   try{
     const apiMessages=buildApiMessages(convs[currentId].messages.slice(-20));
-    await streamReply(apiMessages);
+    if(compareEnabled){await streamCompare(apiMessages)}
+    else{await streamReply(apiMessages)}
   }finally{loading=false;setStopVisible(false);updateSendBtn()}
 }
  
@@ -2502,6 +2719,22 @@ window.addEventListener('resize',()=>{
   const target=document.querySelector(step.target);if(!target)return;
   positionOnboardingTooltip(document.getElementById('onboarding-tooltip'),target.getBoundingClientRect(),step.placement);
 });
+
+// ── SPLASH SCREEN : masqué une fois les polices chargées (ou après 2s max) ──
+function hideSplash(){
+  const s=document.getElementById('splash-screen');
+  if(!s)return;
+  s.classList.add('hide');
+  setTimeout(()=>s.remove(),400);
+}
+(function(){
+  const pageLoaded=new Promise(res=>{
+    if(document.readyState==='complete')res();else window.addEventListener('load',res);
+  });
+  const fontsReady=(window.document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();
+  Promise.all([pageLoaded,fontsReady]).then(hideSplash);
+  setTimeout(hideSplash,2000); // filet de sécurité : jamais plus de 2s d'attente
+})();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{})});
