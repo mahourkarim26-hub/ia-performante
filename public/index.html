@@ -1391,7 +1391,7 @@ function save(){
  
 // ── SUPABASE : AUTH & SYNCHRONISATION (gratuit, optionnel) ──
 function openAuthModal(){
-  if(currentUser){
+  if(currentUser&&!currentUser.is_anonymous){
     openConfirm(()=>{signOutUser()});
     document.querySelector('.confirm-title').textContent='Se déconnecter ?';
     document.querySelector('.confirm-sub').textContent=currentUser.email+' — tes conversations resteront disponibles hors-ligne sur cet appareil.';
@@ -1402,6 +1402,9 @@ function openAuthModal(){
   document.getElementById('auth-step-sent').style.display='none';
   document.getElementById('auth-modal').style.display='block';
   document.getElementById('auth-backdrop').style.display='block';
+  document.getElementById('show-recovery-btn').style.display=(currentUser&&currentUser.is_anonymous)?'block':'none';
+  document.getElementById('auth-recovery-reveal').style.display='none';
+  document.getElementById('restore-code-input').value='';
 }
 function closeAuthModal(){
   document.getElementById('auth-modal').style.display='none';
@@ -1411,8 +1414,14 @@ async function sendMagicLink(){
   if(!supa){toast('Synchronisation non configurée');return}
   const email=document.getElementById('auth-email-input').value.trim();
   if(!email||!email.includes('@')){toast('Email invalide');return}
-  const btn=event?.target;
-  const{error}=await supa.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});
+  let error;
+  if(currentUser&&currentUser.is_anonymous){
+    // Lie l'email à la session anonyme existante : même user id, donc toutes les
+    // conversations déjà sauvegardées restent associées une fois l'email confirmé.
+    ({error}=await supa.auth.updateUser({email}));
+  } else {
+    ({error}=await supa.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}}));
+  }
   if(error){toast('Erreur : '+error.message);return}
   document.getElementById('auth-step-email').style.display='none';
   document.getElementById('auth-step-sent').style.display='block';
@@ -1425,7 +1434,9 @@ async function signOutUser(){
 function updateAccountUI(){
   const el=document.getElementById('account-status');
   if(!el)return;
-  el.textContent=currentUser?('☁️ '+currentUser.email):'👤 Invité (local uniquement)';
+  if(currentUser&&!currentUser.is_anonymous)el.textContent='☁️ '+currentUser.email;
+  else if(currentUser&&currentUser.is_anonymous)el.textContent='🔒 Sauvegarde active (cet appareil)';
+  else el.textContent='👤 Invité (local uniquement)';
 }
 async function syncFromCloud(){
   if(!supa||!currentUser)return;
@@ -1457,17 +1468,65 @@ async function deleteConvFromCloud(id){
   if(!supa||!currentUser)return;
   try{await supa.from('conversations').delete().eq('id',id).eq('user_id',currentUser.id)}catch(e){}
 }
+
+// ── SAUVEGARDE ANONYME (Supabase Anonymous Auth) ──
+// Dès la 1re visite, une session anonyme est créée en arrière-plan (aucune action
+// utilisateur) et les conversations sont sauvegardées dans le cloud sous cet id —
+// comme un compte connecté, sans friction. Nécessite "Allow anonymous sign-ins"
+// activé dans Supabase → Authentication → Settings. Si désactivé côté projet,
+// signInAnonymously() échoue silencieusement et le site reste en local uniquement
+// (comportement inchangé, aucun crash).
+async function initAnonymousSession(){
+  if(!supa||currentUser)return;
+  try{
+    const{data,error}=await supa.auth.signInAnonymously();
+    if(error||!data?.user)return;
+    currentUser=data.user;
+    updateAccountUI();updateQuotaBar();
+    for(const id of Object.keys(convs))await pushConvToCloud(id);
+  }catch(e){/* pas de compte anonyme possible, on reste en local */}
+}
+function copyRecoveryCode(){
+  const el=document.getElementById('recovery-code-text');
+  navigator.clipboard.writeText(el.value).then(()=>toast('Code copié — garde-le en lieu sûr'));
+}
+async function showRecoveryCode(){
+  if(!supa)return;
+  const{data}=await supa.auth.getSession();
+  const refreshToken=data?.session?.refresh_token;
+  if(!refreshToken){toast('Aucune session à sauvegarder');return}
+  document.getElementById('recovery-code-text').value=refreshToken;
+  document.getElementById('auth-recovery-reveal').style.display='block';
+  document.getElementById('show-recovery-btn').style.display='none';
+}
+async function restoreFromCode(){
+  if(!supa){toast('Synchronisation non configurée');return}
+  const code=document.getElementById('restore-code-input').value.trim();
+  if(!code){toast('Colle un code d\'abord');return}
+  if(!confirm('Restaurer ce code remplacera les conversations actuelles sur cet appareil. Continuer ?'))return;
+  try{
+    const{data,error}=await supa.auth.refreshSession({refresh_token:code});
+    if(error||!data?.session){toast('Code invalide ou expiré');return}
+    currentUser=data.user;
+    closeAuthModal();updateAccountUI();updateQuotaBar();
+    toast('✅ Session restaurée — synchronisation...');
+    await syncFromCloud();
+  }catch(e){toast('Erreur : code invalide')}
+}
+
 if(supa){
-  supa.auth.getSession().then(({data})=>{
+  supa.auth.getSession().then(async({data})=>{
     currentUser=data?.session?.user||null;
-    updateAccountUI();
-    if(currentUser)syncFromCloud();
+    updateAccountUI();updateQuotaBar();
+    if(currentUser){await syncFromCloud();}
+    else{await initAnonymousSession();}
   });
   supa.auth.onAuthStateChange((event,session)=>{
+    const wasAnon=currentUser?.is_anonymous;
     currentUser=session?.user||null;
     updateAccountUI();
     updateQuotaBar();
-    if(event==='SIGNED_IN'){closeAuthModal();syncFromCloud();}
+    if(event==='SIGNED_IN'&&currentUser&&!currentUser.is_anonymous){closeAuthModal();syncFromCloud();}
     if(event==='SIGNED_OUT'){renderSidebar()}
   });
 }
@@ -2571,6 +2630,7 @@ ta.addEventListener('input',()=>{
   ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,120)+'px';
   updateSendBtn();document.getElementById('char-count').textContent=ta.value.length>0?ta.value.length+' car':'';
   updateSlashMenu();
+  clearTimeout(ta._draftTO);ta._draftTO=setTimeout(()=>{if(ta.value.trim())localStorage.setItem(DRAFT_KEY,ta.value);else localStorage.removeItem(DRAFT_KEY)},400);
 });
 ta.addEventListener('keydown',e=>{
   const menu=document.getElementById('slash-menu');
