@@ -1044,7 +1044,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_dJ0J0aaN8igcqGg6OyxuMw_dMjK81KH';
 const supa = (SUPABASE_URL.includes('TON-PROJET') || !window.supabase) ? null : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
  
-const CONVS_KEY='ia_convs_v8',CUR_KEY='ia_cur_v8',SETTINGS_KEY='ia_settings_v4',FOLDERS_KEY='ia_folders_v1',QUOTA_KEY='ia_quota_v1';
+const CONVS_KEY='ia_convs_v8',CUR_KEY='ia_cur_v8',SETTINGS_KEY='ia_settings_v4',FOLDERS_KEY='ia_folders_v1',QUOTA_KEY='ia_quota_v1',DRAFT_KEY='ia_draft_v1';
 let convs={},currentId=null,loading=false,pendingFiles=[];
 let settings={systemPrompt:'',fontSize:13,theme:'dark'};
 let currentModel='openai/gpt-oss-120b';
@@ -1362,6 +1362,7 @@ function load(){
   try{convs=JSON.parse(localStorage.getItem(CONVS_KEY)||'{}')}catch(e){convs={}}
   currentId=localStorage.getItem(CUR_KEY)||null;
   loadFolders();
+  ta.value=localStorage.getItem(DRAFT_KEY)||'';
   loadPrompts();
   renderSidebar();
   if(currentId&&convs[currentId])loadConv(currentId);
