@@ -1012,6 +1012,30 @@
 <div id="toast"></div>
  
 <script>
+// ── FILET DE SÉCURITÉ GLOBAL ──
+// Attrape toute erreur JS non gérée (bug dans le code, extension navigateur qui
+// interfère, etc.) et affiche un avertissement au lieu de laisser la page
+// silencieusement cassée. N'empêche pas l'erreur d'apparaître dans la console
+// (utile pour le debug) — ça évite juste qu'un utilisateur reste bloqué sans
+// aucun signal visible.
+window.onerror = function(msg, url, line, col, error){
+  try{
+    const t=document.getElementById('toast');
+    if(t){t.textContent='⚠️ Petit bug — réessaie, ou recharge la page si ça persiste';t.classList.add('show');
+      clearTimeout(t._to);t._to=setTimeout(()=>t.classList.remove('show'),4000);}
+  }catch(e){}
+  console.error('Erreur JS non gérée :',msg,'(ligne '+line+')',error);
+  return false;
+};
+window.addEventListener('unhandledrejection',function(e){
+  try{
+    const t=document.getElementById('toast');
+    if(t){t.textContent='⚠️ Petit bug — réessaie, ou recharge la page si ça persiste';t.classList.add('show');
+      clearTimeout(t._to);t._to=setTimeout(()=>t.classList.remove('show'),4000);}
+  }catch(err){}
+  console.error('Promise rejetée sans gestion :',e.reason);
+});
+
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
  
 // ══════════════════════════════════════════════════════════════════════
