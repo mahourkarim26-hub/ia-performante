@@ -1354,6 +1354,80 @@ async function exportPDF(){
   toast('PDF téléchargé ✓');
 }
  
+// ── EXPORT PDF STYLÉ (pour une réponse précise : lettre, CV, post...) ──
+// Rendu présentable : bandeau coloré en haut, titre détecté automatiquement,
+// corps de texte proprement mis en page avec marges et interligne soignés,
+// numérotation des pages. Pensé pour être imprimable/envoyable tel quel.
+function exportStyledPDF(text){
+  if(!window.jspdf){toast('Erreur : librairie PDF non chargée');return}
+  if(!text||!text.trim()){toast('Rien à exporter');return}
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'pt',format:'a4'});
+  const pageW=doc.internal.pageSize.getWidth();
+  const pageH=doc.internal.pageSize.getHeight();
+  const margin=56;
+  const maxW=pageW-margin*2;
+  const bandH=64;
+
+  function drawHeaderBand(){
+    doc.setFillColor(22,163,74);
+    doc.rect(0,0,pageW,bandH,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');doc.setFontSize(10);
+    doc.text('IA PERFORMANTE',margin,bandH/2+4);
+  }
+
+  drawHeaderBand();
+  let y=bandH+40;
+  doc.setTextColor(20,20,20);
+
+  // Détecte un titre : première ligne courte, non vide
+  const rawLines=text.split('\n').map(l=>l.trim());
+  const firstNonEmpty=rawLines.findIndex(l=>l.length>0);
+  let title=null,bodyText=text;
+  if(firstNonEmpty!==-1&&rawLines[firstNonEmpty].length<90&&!rawLines[firstNonEmpty].endsWith('.')){
+    title=rawLines[firstNonEmpty];
+    bodyText=rawLines.slice(firstNonEmpty+1).join('\n').trim();
+  }
+  if(title){
+    doc.setFont('helvetica','bold');doc.setFontSize(17);
+    const titleLines=doc.splitTextToSize(title,maxW);
+    doc.text(titleLines,margin,y);y+=titleLines.length*21+8;
+    doc.setDrawColor(22,163,74);doc.setLineWidth(1.4);
+    doc.line(margin,y,margin+64,y);y+=22;
+  }
+
+  doc.setFont('helvetica','normal');doc.setFontSize(11);
+  const paragraphs=(bodyText||text).split(/\n\s*\n|\n(?=\S)/).filter(p=>p.trim());
+  const finalParagraphs=paragraphs.length?paragraphs:[bodyText||text];
+
+  function ensureSpace(h){
+    if(y+h>pageH-56){doc.addPage();drawHeaderBand();y=bandH+40;doc.setFont('helvetica','normal');doc.setFontSize(11);doc.setTextColor(20,20,20)}
+  }
+  finalParagraphs.forEach(p=>{
+    const lines=doc.splitTextToSize(p.trim(),maxW);
+    lines.forEach(line=>{ensureSpace(16);doc.text(line,margin,y);y+=16});
+    y+=10;
+  });
+
+  const pageCount=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(140,140,140);
+    doc.text('Page '+i+'/'+pageCount,pageW-margin-40,pageH-24);
+    doc.text('Généré avec IA Performante',margin,pageH-24);
+  }
+
+  const filename=(title||'document').toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,40)||'document';
+  doc.save(filename+'.pdf');
+  toast('PDF téléchargé ✓');
+}
+function exportMsgAsStyledPDF(btn){
+  const bubble=btn.closest('.row').querySelector('.bubble');
+  const text=bubble?.innerText||bubble?.textContent||'';
+  exportStyledPDF(text);
+}
+
 function getDisplayText(m){
   if(typeof m.displayContent==='string')return m.displayContent;
   if(typeof m.content==='string')return m.content;
@@ -2328,6 +2402,7 @@ function addMsgDOM(role,content,ts,chips,msgId){
       <button class="msg-action" onclick="copyMsg(this)">📋 Copier</button>
       <button class="msg-action" onclick="regenerate()">🔄 Régénérer</button>
       <button class="msg-action tts-btn" onclick="ttsMsg(this)" data-playing="0">🔊 TTS</button>
+      <button class="msg-action" onclick="exportMsgAsStyledPDF(this)">📄 PDF stylé</button>
       <button class="msg-action" onclick="pinMsg(this.closest('.row').querySelector('.bubble').innerText||'')">📌 Épingler</button>`;
   } else {
     actions.innerHTML=`
@@ -2527,7 +2602,7 @@ async function streamReply(apiMessages){
     if(wc>30) t.innerHTML=fmtTime(Date.now())+` <span class="wc-badge">${wc} mots · ${elapsed}s</span>`;
  
     const actions=document.createElement('div');actions.className='msg-actions';
-    actions.innerHTML=`<button class="msg-action" onclick="copyMsg(this)">📋 Copier</button><button class="msg-action" onclick="regenerate()">🔄 Régénérer</button><button class="msg-action tts-btn" onclick="ttsMsg(this)" data-playing="0">🔊 TTS</button><button class="msg-action" onclick="pinMsg(this.closest('.row').querySelector('.bubble').innerText||'')">📌 Épingler</button>`;
+    actions.innerHTML=`<button class="msg-action" onclick="copyMsg(this)">📋 Copier</button><button class="msg-action" onclick="regenerate()">🔄 Régénérer</button><button class="msg-action tts-btn" onclick="ttsMsg(this)" data-playing="0">🔊 TTS</button><button class="msg-action" onclick="exportMsgAsStyledPDF(this)">📄 PDF stylé</button><button class="msg-action" onclick="pinMsg(this.closest('.row').querySelector('.bubble').innerText||'')">📌 Épingler</button>`;
     wrap.appendChild(actions);
  
     // Reactions
