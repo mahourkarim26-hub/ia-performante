@@ -23,7 +23,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljs-theme">
   <style>
     :root[data-theme="dark"]{
@@ -1370,11 +1373,15 @@ function exportStyledPDF(text){
   const bandH=64;
 
   function drawHeaderBand(){
+    doc.setFillColor(240,253,244); // léger fond vert très clair sur toute la page
+    doc.rect(0,0,pageW,pageH,'F');
     doc.setFillColor(22,163,74);
     doc.rect(0,0,pageW,bandH,'F');
     doc.setTextColor(255,255,255);
     doc.setFont('helvetica','bold');doc.setFontSize(10);
     doc.text('IA PERFORMANTE',margin,bandH/2+4);
+    doc.setFillColor(255,255,255);
+    doc.roundedRect(margin-14,bandH+16,pageW-2*(margin-14),pageH-bandH-16-56,6,6,'F');
   }
 
   drawHeaderBand();
@@ -1422,10 +1429,90 @@ function exportStyledPDF(text){
   doc.save(filename+'.pdf');
   toast('PDF téléchargé ✓');
 }
+// Récupère le texte BRUT d'un message (celui envoyé par l'IA, stocké en mémoire)
+// plutôt que le texte affiché à l'écran (bubble.innerText), qui peut être déformé
+// si le rendu visuel force des coupures de mots (ex: tableau trop étroit dans la
+// bulle de chat → chaque lettre sur sa propre ligne → texte inutilisable une fois extrait).
+// ── EXPORT POWERPOINT STYLÉ (.pptx réel, généré dans le navigateur) ──
+// Découpe le texte de la réponse en diapositives à partir des titres markdown
+// (# ## ###) ou, à défaut, en blocs de 6 points. Applique un design cohérent
+// (bandeau coloré, fond clair, police lisible) sur chaque diapo.
+function parseIntoSlides(text){
+  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const slides=[];
+  let current=null;
+  const headerRe=/^#{1,3}\s+(.*)/;
+  lines.forEach(line=>{
+    const m=line.match(headerRe);
+    if(m){
+      current={title:m[1].replace(/[*_`]/g,'').trim(),bullets:[]};
+      slides.push(current);
+    } else {
+      const bulletText=line.replace(/^[-*•]\s*/,'').replace(/^\d+\.\s*/,'').replace(/[*_`#]/g,'').trim();
+      if(!bulletText)return;
+      if(!current){current={title:'',bullets:[]};slides.push(current);}
+      current.bullets.push(bulletText);
+    }
+  });
+  const MAX_BULLETS=6;
+  const finalSlides=[];
+  slides.forEach(s=>{
+    if(!s.bullets.length){finalSlides.push(s);return}
+    for(let i=0;i<s.bullets.length;i+=MAX_BULLETS){
+      finalSlides.push({title:s.title,bullets:s.bullets.slice(i,i+MAX_BULLETS)});
+    }
+  });
+  return finalSlides.length?finalSlides:[{title:'Présentation',bullets:lines}];
+}
+function exportStyledPPTX(text){
+  if(!window.PptxGenJS){toast('Erreur : librairie PowerPoint non chargée');return}
+  if(!text||!text.trim()){toast('Rien à exporter');return}
+  const pptx=new PptxGenJS();
+  pptx.defineLayout({name:'IA',width:10,height:5.63});
+  pptx.layout='IA';
+  const ACCENT='16A34A',DARK='0B1610',LIGHT='F0FDF4',TEXTCOL='052E16';
+  const slidesData=parseIntoSlides(text);
+  const deckTitle=slidesData[0]?.title||'Présentation';
+
+  // Diapo de titre
+  const titleSlide=pptx.addSlide();
+  titleSlide.background={color:DARK};
+  titleSlide.addShape(pptx.ShapeType.rect,{x:0,y:2.55,w:10,h:0.06,fill:{color:ACCENT}});
+  titleSlide.addText(deckTitle,{x:0.6,y:1.9,w:8.8,h:1.1,fontSize:32,bold:true,color:'FFFFFF',fontFace:'Arial'});
+  titleSlide.addText('Généré avec IA Performante',{x:0.6,y:4.95,w:8.8,h:0.4,fontSize:11,color:ACCENT,fontFace:'Arial'});
+
+  const contentSlides=slidesData[0]&&!slidesData[0].bullets.length?slidesData.slice(1):slidesData;
+  contentSlides.forEach((s,idx)=>{
+    const slide=pptx.addSlide();
+    slide.background={color:LIGHT};
+    slide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:10,h:0.9,fill:{color:ACCENT}});
+    slide.addText(s.title||deckTitle,{x:0.5,y:0.15,w:9,h:0.6,fontSize:22,bold:true,color:'FFFFFF',fontFace:'Arial'});
+    if(s.bullets.length){
+      slide.addText(s.bullets.map(b=>({text:b,options:{bullet:{code:'25AA'},breakLine:true,color:TEXTCOL}})),{x:0.6,y:1.25,w:8.8,h:4,fontSize:16,fontFace:'Arial',valign:'top'});
+    }
+    slide.addText((idx+1)+'/'+contentSlides.length,{x:9.2,y:5.25,w:0.7,h:0.3,fontSize:9,color:'6B8F79',fontFace:'Arial',align:'right'});
+  });
+
+  const filename=deckTitle.toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,40)||'presentation';
+  pptx.writeFile({fileName:filename+'.pptx'});
+  toast('PowerPoint téléchargé ✓');
+}
+
+function getRawMsgText(btn){
+  const row=btn.closest('.row');const mid=row?.dataset.mid;
+  const c=convs[currentId];
+  if(c&&mid){
+    const m=c.messages.find(mm=>mm.id===mid);
+    if(m)return getDisplayText(m);
+  }
+  const bubble=row?.querySelector('.bubble');
+  return bubble?.innerText||bubble?.textContent||'';
+}
 function exportMsgAsStyledPDF(btn){
-  const bubble=btn.closest('.row').querySelector('.bubble');
-  const text=bubble?.innerText||bubble?.textContent||'';
-  exportStyledPDF(text);
+  exportStyledPDF(getRawMsgText(btn));
+}
+function exportMsgAsStyledPPTX(btn){
+  exportStyledPPTX(getRawMsgText(btn));
 }
 
 function getDisplayText(m){
@@ -2403,6 +2490,7 @@ function addMsgDOM(role,content,ts,chips,msgId){
       <button class="msg-action" onclick="regenerate()">🔄 Régénérer</button>
       <button class="msg-action tts-btn" onclick="ttsMsg(this)" data-playing="0">🔊 TTS</button>
       <button class="msg-action" onclick="exportMsgAsStyledPDF(this)">📄 PDF stylé</button>
+      <button class="msg-action" onclick="exportMsgAsStyledPPTX(this)">🖼️ PowerPoint</button>
       <button class="msg-action" onclick="pinMsg(this.closest('.row').querySelector('.bubble').innerText||'')">📌 Épingler</button>`;
   } else {
     actions.innerHTML=`
@@ -2602,7 +2690,7 @@ async function streamReply(apiMessages){
     if(wc>30) t.innerHTML=fmtTime(Date.now())+` <span class="wc-badge">${wc} mots · ${elapsed}s</span>`;
  
     const actions=document.createElement('div');actions.className='msg-actions';
-    actions.innerHTML=`<button class="msg-action" onclick="copyMsg(this)">📋 Copier</button><button class="msg-action" onclick="regenerate()">🔄 Régénérer</button><button class="msg-action tts-btn" onclick="ttsMsg(this)" data-playing="0">🔊 TTS</button><button class="msg-action" onclick="exportMsgAsStyledPDF(this)">📄 PDF stylé</button><button class="msg-action" onclick="pinMsg(this.closest('.row').querySelector('.bubble').innerText||'')">📌 Épingler</button>`;
+    actions.innerHTML=`<button class="msg-action" onclick="copyMsg(this)">📋 Copier</button><button class="msg-action" onclick="regenerate()">🔄 Régénérer</button><button class="msg-action tts-btn" onclick="ttsMsg(this)" data-playing="0">🔊 TTS</button><button class="msg-action" onclick="exportMsgAsStyledPDF(this)">📄 PDF stylé</button><button class="msg-action" onclick="exportMsgAsStyledPPTX(this)">🖼️ PowerPoint</button><button class="msg-action" onclick="pinMsg(this.closest('.row').querySelector('.bubble').innerText||'')">📌 Épingler</button>`;
     wrap.appendChild(actions);
  
     // Reactions
