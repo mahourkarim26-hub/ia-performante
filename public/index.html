@@ -1361,7 +1361,25 @@ async function exportPDF(){
 // Rendu présentable : bandeau coloré en haut, titre détecté automatiquement,
 // corps de texte proprement mis en page avec marges et interligne soignés,
 // numérotation des pages. Pensé pour être imprimable/envoyable tel quel.
+// Nettoie les tableaux markdown bruts (| cellule | cellule |) en texte lisible,
+// utilisé par les deux exports (PDF et PowerPoint) puisqu'ils travaillent sur
+// le texte source brut de l'IA, pas sur le rendu HTML déjà mis en forme.
+function stripMarkdownTables(text){
+  const isTableSeparator=l=>/^\|?[\s:|-]+\|?$/.test(l)&&l.includes('-');
+  const isTableRow=l=>l.trim().startsWith('|')&&l.trim().endsWith('|');
+  return text.split('\n').map(line=>{
+    const trimmed=line.trim();
+    if(isTableSeparator(trimmed))return null;
+    if(isTableRow(trimmed)){
+      const cells=trimmed.split('|').map(c=>c.trim()).filter(Boolean);
+      return cells.join(' — ');
+    }
+    return line;
+  }).filter(l=>l!==null).join('\n');
+}
+
 function exportStyledPDF(text){
+  text=stripMarkdownTables(text||'');
   if(!window.jspdf){toast('Erreur : librairie PDF non chargée');return}
   if(!text||!text.trim()){toast('Rien à exporter');return}
   const{jsPDF}=window.jspdf;
@@ -1438,6 +1456,7 @@ function exportStyledPDF(text){
 // (# ## ###) ou, à défaut, en blocs de 6 points. Applique un design cohérent
 // (bandeau coloré, fond clair, police lisible) sur chaque diapo.
 function parseIntoSlides(text){
+  text=stripMarkdownTables(text||'');
   const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
   const slides=[];
   let current=null;
