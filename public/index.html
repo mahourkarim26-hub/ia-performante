@@ -1603,10 +1603,20 @@ async function syncFromCloud(){
     (data||[]).forEach(row=>{
       cloudConvs[row.id]={id:row.id,title:row.title,messages:row.messages||[],date:row.date,favorite:!!row.favorite};
     });
-    convs=cloudConvs;
+    // Fusionne au lieu d'écraser : une conversation créée localement mais pas
+    // encore synchronisée (onglet fermé trop vite après création) ne doit pas
+    // disparaître — sinon on retombe sur "nouvelle conversation" au retour.
+    convs={...convs,...cloudConvs};
     localStorage.setItem(CONVS_KEY,JSON.stringify(convs));
     renderSidebar();
-    if(currentId&&convs[currentId])loadConv(currentId);else newChat();
+    if(currentId&&convs[currentId]){
+      loadConv(currentId);
+    } else if(Object.keys(convs).length){
+      // Pas de conversation active locale (nouvel appareil, stockage effacé…) :
+      // on rouvre la plus récente plutôt que de montrer une page vide.
+      const mostRecent=Object.values(convs).sort((a,b)=>b.date-a.date)[0];
+      loadConv(mostRecent.id);
+    }
     toast('☁️ Conversations synchronisées');
   }catch(e){toast('Erreur de synchronisation')}
 }
@@ -2383,6 +2393,12 @@ function getOrCreate(firstMsg){
 // ── MARKDOWN ──
 function fmtMd(text){
   text=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Normalise les retours à la ligne Windows (\r\n) en \n simple
+  text=text.replace(/\r\n/g,'\n');
+  // Certains modèles laissent des espaces en fin de ligne, ce qui empêche la
+  // détection des tableaux markdown (le tableau reste alors affiché en texte
+  // brut avec les | et --- visibles). On nettoie ça avant tout le reste.
+  text=text.replace(/[^\S\n]+$/gm,'');
   // Le modèle insère parfois du HTML brut (ex: <br>) au lieu de markdown pur —
   // on convertit ces balises échappées en vrais sauts de ligne.
   text=text.replace(/&lt;br\s*\/?&gt;/gi,'\n');
