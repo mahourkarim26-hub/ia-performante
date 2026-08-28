@@ -885,6 +885,7 @@
     <button class="settings-btn secondary" onclick="generateTitle()">✨ Titre IA</button>
     <button class="settings-btn secondary" onclick="shareCurrentConv()">🔗 Partager</button>
     <button class="settings-btn secondary" onclick="openPromptsModal()">📌 Mes prompts</button>
+    <button class="settings-btn" id="premium-btn" onclick="startCheckout()" style="background:linear-gradient(135deg,#f59e0b,#d97706)">⭐ Passer Premium (5€/mois)</button>
     <button class="settings-btn secondary" onclick="clearAllConvs()">🗑️ Tout effacer</button>
   </div>
 </div>
@@ -1051,6 +1052,8 @@ const SUPABASE_URL = 'https://sfbjyduzziwhnsvcwesp.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_dJ0J0aaN8igcqGg6OyxuMw_dMjK81KH';
 const supa = (SUPABASE_URL.includes('TON-PROJET') || !window.supabase) ? null : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
+let isPremium = false;
+let userAccessToken = null;
  
 const CONVS_KEY='ia_convs_v8',CUR_KEY='ia_cur_v8',SETTINGS_KEY='ia_settings_v4',FOLDERS_KEY='ia_folders_v1',QUOTA_KEY='ia_quota_v1',DRAFT_KEY='ia_draft_v1';
 let convs={},currentId=null,loading=false,pendingFiles=[];
@@ -1440,7 +1443,7 @@ function exportStyledPDF(text){
     doc.setPage(i);
     doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(140,140,140);
     doc.text('Page '+i+'/'+pageCount,pageW-margin-40,pageH-24);
-    doc.text('Généré avec IA Performante',margin,pageH-24);
+    if(!isPremium)doc.text('Généré avec IA Performante',margin,pageH-24);
   }
 
   const filename=(title||'document').toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,40)||'document';
@@ -1498,7 +1501,7 @@ function exportStyledPPTX(text){
   titleSlide.background={color:DARK};
   titleSlide.addShape(pptx.ShapeType.rect,{x:0,y:2.55,w:10,h:0.06,fill:{color:ACCENT}});
   titleSlide.addText(deckTitle,{x:0.6,y:1.9,w:8.8,h:1.1,fontSize:32,bold:true,color:'FFFFFF',fontFace:'Arial'});
-  titleSlide.addText('Généré avec IA Performante',{x:0.6,y:4.95,w:8.8,h:0.4,fontSize:11,color:ACCENT,fontFace:'Arial'});
+  if(!isPremium)titleSlide.addText('Généré avec IA Performante',{x:0.6,y:4.95,w:8.8,h:0.4,fontSize:11,color:ACCENT,fontFace:'Arial'});
 
   const contentSlides=slidesData[0]&&!slidesData[0].bullets.length?slidesData.slice(1):slidesData;
   contentSlides.forEach((s,idx)=>{
@@ -1610,8 +1613,32 @@ async function signOutUser(){
 }
 function updateAccountUI(){
   const el=document.getElementById('account-status');
-  if(!el)return;
-  el.textContent=currentUser?('☁️ '+currentUser.email):'👤 Invité (local uniquement)';
+  if(el)el.textContent=currentUser?((isPremium?'⭐ ':'☁️ ')+currentUser.email+(isPremium?' · Premium':'')):'👤 Invité (local uniquement)';
+  const btn=document.getElementById('premium-btn');
+  if(btn)btn.style.display=(currentUser&&!isPremium)?'inline-flex':'none';
+}
+async function checkPremiumStatus(){
+  if(!supa||!currentUser){isPremium=false;updateAccountUI();return}
+  try{
+    const{data}=await supa.from('premium_status').select('active').eq('user_id',currentUser.id).maybeSingle();
+    isPremium=!!data?.active;
+  }catch(e){isPremium=false}
+  updateAccountUI();
+}
+async function startCheckout(){
+  if(!currentUser){toast('Connecte-toi d\'abord');closeSettings();openAuthModal();return}
+  const btn=document.getElementById('premium-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Redirection…'}
+  try{
+    const r=await fetch('/api/create-checkout-session',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({userId:currentUser.id,email:currentUser.email})
+    });
+    const data=await r.json();
+    if(data.url){window.location.href=data.url;return}
+    toast('Erreur : '+(data.error||'paiement indisponible'));
+  }catch(e){toast('Erreur de connexion au paiement')}
+  if(btn){btn.disabled=false;btn.textContent='⭐ Passer Premium (5€/mois)'}
 }
 async function syncFromCloud(){
   if(!supa||!currentUser)return;
@@ -1656,15 +1683,17 @@ async function deleteConvFromCloud(id){
 if(supa){
   supa.auth.getSession().then(({data})=>{
     currentUser=data?.session?.user||null;
+    userAccessToken=data?.session?.access_token||null;
     updateAccountUI();
-    if(currentUser)syncFromCloud();
+    if(currentUser){syncFromCloud();checkPremiumStatus();}
   });
   supa.auth.onAuthStateChange((event,session)=>{
     currentUser=session?.user||null;
+    userAccessToken=session?.access_token||null;
     updateAccountUI();
     updateQuotaBar();
-    if(event==='SIGNED_IN'){closeAuthModal();syncFromCloud();}
-    if(event==='SIGNED_OUT'){renderSidebar()}
+    if(event==='SIGNED_IN'){closeAuthModal();syncFromCloud();checkPremiumStatus();}
+    if(event==='SIGNED_OUT'){isPremium=false;updateAccountUI();renderSidebar()}
   });
 }
  
@@ -2120,7 +2149,7 @@ async function streamCompare(apiMessages){
     let fullText='';
     try{
       const r=await fetch('/api/chat',{
-        method:'POST',headers:{'Content-Type':'application/json'},
+        method:'POST',headers:{'Content-Type':'application/json',...(userAccessToken?{'Authorization':'Bearer '+userAccessToken}:{})},
         body:JSON.stringify({messages:apiMessages,model,temperature:temp,systemPrompt:settings.systemPrompt||undefined,stream:true,webSearch:webSearchEnabled})
       });
       if(!r.ok){const err=await r.json().catch(()=>({}));throw new Error(err?.error?.message||'Erreur '+r.status)}
@@ -2686,7 +2715,7 @@ async function streamReply(apiMessages){
   const temp=parseFloat(document.getElementById('temp-slider').value)||0.7;
   try{
     const r=await fetch('/api/chat',{
-      method:'POST',headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json',...(userAccessToken?{'Authorization':'Bearer '+userAccessToken}:{})},
       body:JSON.stringify({messages:apiMessages,model:currentModel,temperature:temp,systemPrompt:settings.systemPrompt||undefined,stream:true,webSearch:webSearchEnabled})
     });
     if(!r.ok){const err=await r.json().catch(()=>({}));throw new Error(err?.error?.message||'Erreur '+r.status)}
