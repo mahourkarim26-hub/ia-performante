@@ -89,13 +89,34 @@ function estimateContentLength(content) {
   return String(content || '').length;
 }
 
+// ── Vérification du statut premium (via Authorization: Bearer <token utilisateur>) ──
+// Interroge Supabase avec le JWT de l'utilisateur (pas une clé serveur) : les
+// règles RLS garantissent qu'il ne peut lire que SON PROPRE statut, donc cette
+// vérification est fiable même si elle est faite depuis un simple fetch.
+const SUPABASE_URL_CHAT = 'https://sfbjyduzziwhnsvcwesp.supabase.co';
+const SUPABASE_ANON_KEY_CHAT = 'sb_publishable_dJ0J0aaN8igcqGg6OyxuMw_dMjK81KH';
+async function isPremiumUser(authHeader) {
+  if (!authHeader) return false;
+  try {
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const r = await fetch(`${SUPABASE_URL_CHAT}/rest/v1/premium_status?select=active`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY_CHAT, 'Authorization': 'Bearer ' + token }
+    });
+    if (!r.ok) return false;
+    const rows = await r.json();
+    return !!rows?.[0]?.active;
+  } catch (e) {
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   const origin = req.headers.origin;
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Vary', 'Origin');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -105,6 +126,7 @@ export default async function handler(req, res) {
   if (isRateLimited(ip)) {
     return res.status(429).json({ error: { message: 'Trop de requêtes — réessaie dans quelques minutes.' } });
   }
+  const isPremium = await isPremiumUser(req.headers['authorization']);
 
   const SYSTEM = req.body?.systemPrompt || `Tu es un assistant IA de très haut niveau, expert généraliste et spécialiste à la demande. Tu es rigoureux, honnête, précis, et tu t'adaptes au niveau et au contexte de chaque utilisateur.
 
@@ -125,6 +147,8 @@ export default async function handler(req, res) {
 - Utilise la mise en forme markdown pour la lisibilité.
 - N'utilise JAMAIS de balises HTML (comme <br>, <b>, <div>) dans tes réponses, même dans un tableau. Pour un saut de ligne dans une cellule de tableau, utilise une virgule ou un point-virgule à la place.
 - N'utilise JAMAIS de marqueurs de citation type 【1†source】 ou [1] : quand tu cites une source web, écris-la simplement en texte normal, par exemple "(source : nom du site)".
+- Quand on te demande de créer un document (CV, lettre de motivation, présentation/PowerPoint, post, rapport, etc.) : génère-le DIRECTEMENT et en entier, avec des hypothèses raisonnables pour les détails manquants (des exemples plausibles entre crochets si besoin, ex: [Votre Nom]). Ne renvoie JAMAIS un tableau de questions de clarification avant de produire le contenu — l'utilisateur préfère un premier jet complet qu'il pourra ensuite ajuster. Pose une question seulement si une information est absolument bloquante et ne peut raisonnablement pas être devinée.
+- Pour une présentation/PowerPoint : structure toujours ta réponse avec des titres markdown clairs (## Titre de la diapo) suivis de listes à puces courtes (une idée par ligne, pas de phrases longues) — ce format est ensuite converti automatiquement en vraies diapositives.
 
 ## 5. HONNÊTETÉ ET LIMITES
 - Reconnais tes limites honnêtement.
@@ -206,7 +230,7 @@ export default async function handler(req, res) {
           const cached = getWebCache(query);
           if (cached) {
             webSearchResults = cached;
-          } else if (isWebRateLimited(ip)) {
+          } else if (!isPremium && isWebRateLimited(ip)) {
             webSearchResults = '\n\n[Recherche web indisponible : limite horaire atteinte. Réponds du mieux que tu peux sans elle, et précise que la recherche web est temporairement limitée.]';
           } else {
             const tavilyRes = await fetch('https://api.tavily.com/search', {
