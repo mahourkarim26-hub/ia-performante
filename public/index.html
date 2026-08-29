@@ -677,6 +677,7 @@
         <input type="text" id="rename-input" onblur="finishRename()" onkeydown="if(event.key==='Enter')finishRename();if(event.key==='Escape')cancelRename()"/>
         <div class="header-sub">vision · streaming · img gen · pdf · multi-modèles</div>
       </div>
+      <button id="premium-header-btn" onclick="startCheckout()" style="display:none;margin-left:8px;padding:4px 11px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:7px;color:#fff;font-size:10.5px;font-weight:700;font-family:'Space Grotesk',sans-serif;cursor:pointer;white-space:nowrap;flex-shrink:0">⭐ Premium</button>
       <div class="header-right">
         <div id="token-display" onclick="openSettings()" title="Tokens utilisés — clic pour paramètres">0 tok</div>
         <select id="model-select" onchange="onModelChange()">
@@ -885,7 +886,6 @@
     <button class="settings-btn secondary" onclick="generateTitle()">✨ Titre IA</button>
     <button class="settings-btn secondary" onclick="shareCurrentConv()">🔗 Partager</button>
     <button class="settings-btn secondary" onclick="openPromptsModal()">📌 Mes prompts</button>
-    <button class="settings-btn" id="premium-btn" onclick="startCheckout()" style="background:linear-gradient(135deg,#f59e0b,#d97706)">⭐ Passer Premium (5€/mois)</button>
     <button class="settings-btn secondary" onclick="clearAllConvs()">🗑️ Tout effacer</button>
   </div>
 </div>
@@ -1614,8 +1614,8 @@ async function signOutUser(){
 function updateAccountUI(){
   const el=document.getElementById('account-status');
   if(el)el.textContent=currentUser?((isPremium?'⭐ ':'☁️ ')+currentUser.email+(isPremium?' · Premium':'')):'👤 Invité (local uniquement)';
-  const btn=document.getElementById('premium-btn');
-  if(btn)btn.style.display=(currentUser&&!isPremium)?'inline-flex':'none';
+  const btn=document.getElementById('premium-header-btn');
+  if(btn)btn.style.display=(currentUser&&!isPremium)?'inline-block':'none';
 }
 async function checkPremiumStatus(){
   if(!supa||!currentUser){isPremium=false;updateAccountUI();return}
@@ -1627,8 +1627,8 @@ async function checkPremiumStatus(){
 }
 async function startCheckout(){
   if(!currentUser){toast('Connecte-toi d\'abord');closeSettings();openAuthModal();return}
-  const btn=document.getElementById('premium-btn');
-  if(btn){btn.disabled=true;btn.textContent='⏳ Redirection…'}
+  const btn=document.getElementById('premium-header-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳…'}
   try{
     const r=await fetch('/api/create-checkout-session',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -1638,7 +1638,7 @@ async function startCheckout(){
     if(data.url){window.location.href=data.url;return}
     toast('Erreur : '+(data.error||'paiement indisponible'));
   }catch(e){toast('Erreur de connexion au paiement')}
-  if(btn){btn.disabled=false;btn.textContent='⭐ Passer Premium (5€/mois)'}
+  if(btn){btn.disabled=false;btn.textContent='⭐ Premium'}
 }
 async function syncFromCloud(){
   if(!supa||!currentUser)return;
