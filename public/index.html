@@ -678,7 +678,7 @@
         <div class="header-sub">vision · streaming · img gen · pdf · multi-modèles</div>
       </div>
       <button id="premium-header-btn" onclick="openPremiumInfoModal()" style="display:none;margin-left:8px;padding:4px 11px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:7px;color:#fff;font-size:10.5px;font-weight:700;font-family:'Space Grotesk',sans-serif;cursor:pointer;white-space:nowrap;flex-shrink:0">⭐ Premium</button>
-      <div id="premium-badge" style="display:none;margin-left:8px;padding:3px 9px;background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:20px;color:#451a03;font-size:9.5px;font-weight:800;font-family:'JetBrains Mono',monospace;white-space:nowrap;flex-shrink:0;letter-spacing:.5px;box-shadow:0 2px 8px rgba(245,158,11,0.4)">⭐ PREMIUM</div>
+      <div id="premium-badge" onclick="openManageSubscription()" title="Gérer mon abonnement" style="display:none;margin-left:8px;padding:3px 9px;background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:20px;color:#451a03;font-size:9.5px;font-weight:800;font-family:'JetBrains Mono',monospace;white-space:nowrap;flex-shrink:0;letter-spacing:.5px;box-shadow:0 2px 8px rgba(245,158,11,0.4);cursor:pointer">⭐ PREMIUM</div>
       <div class="header-right">
         <div id="token-display" onclick="openSettings()" title="Tokens utilisés — clic pour paramètres">0 tok</div>
         <select id="model-select" onchange="onModelChange()">
@@ -1072,6 +1072,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_dJ0J0aaN8igcqGg6OyxuMw_dMjK81KH';
 const supa = (SUPABASE_URL.includes('TON-PROJET') || !window.supabase) ? null : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 let isPremium = false;
+let premiumCustomerId = null;
 let userAccessToken = null;
  
 const CONVS_KEY='ia_convs_v8',CUR_KEY='ia_cur_v8',SETTINGS_KEY='ia_settings_v4',FOLDERS_KEY='ia_folders_v1',QUOTA_KEY='ia_quota_v1',DRAFT_KEY='ia_draft_v1';
@@ -1639,12 +1640,29 @@ function updateAccountUI(){
   if(badge)badge.style.display=(currentUser&&isPremium)?'inline-block':'none';
 }
 async function checkPremiumStatus(){
-  if(!supa||!currentUser){isPremium=false;updateAccountUI();return}
+  if(!supa||!currentUser){isPremium=false;premiumCustomerId=null;updateAccountUI();return}
   try{
-    const{data}=await supa.from('premium_status').select('active').eq('user_id',currentUser.id).maybeSingle();
+    const{data}=await supa.from('premium_status').select('active,stripe_customer_id').eq('user_id',currentUser.id).maybeSingle();
     isPremium=!!data?.active;
-  }catch(e){isPremium=false}
+    premiumCustomerId=data?.stripe_customer_id||null;
+  }catch(e){isPremium=false;premiumCustomerId=null}
   updateAccountUI();
+}
+async function openManageSubscription(){
+  if(!premiumCustomerId){toast('Abonnement introuvable — réessaie dans un instant');return}
+  const badge=document.getElementById('premium-badge');
+  const originalText=badge?badge.textContent:'';
+  if(badge)badge.textContent='⏳…';
+  try{
+    const r=await fetch('/api/create-portal-session',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({customerId:premiumCustomerId})
+    });
+    const data=await r.json();
+    if(data.url){window.location.href=data.url;return}
+    toast('Erreur : '+(data.error||'portail indisponible'));
+  }catch(e){toast('Erreur de connexion')}
+  if(badge)badge.textContent=originalText;
 }
 // ── COMPARATIF "POURQUOI PREMIUM" ──
 const PREMIUM_COMPARISON=[
