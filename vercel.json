@@ -4,12 +4,14 @@
     { "src": "api/chat.js", "use": "@vercel/node" },
     { "src": "api/create-checkout-session.js", "use": "@vercel/node" },
     { "src": "api/stripe-webhook.js", "use": "@vercel/node" },
+    { "src": "api/create-portal-session.js", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/chat", "dest": "/api/chat.js" },
     { "src": "/api/create-checkout-session", "dest": "/api/create-checkout-session.js" },
     { "src": "/api/stripe-webhook", "dest": "/api/stripe-webhook.js" },
+    { "src": "/api/create-portal-session", "dest": "/api/create-portal-session.js" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }
