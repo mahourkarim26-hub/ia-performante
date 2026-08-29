@@ -677,7 +677,8 @@
         <input type="text" id="rename-input" onblur="finishRename()" onkeydown="if(event.key==='Enter')finishRename();if(event.key==='Escape')cancelRename()"/>
         <div class="header-sub">vision · streaming · img gen · pdf · multi-modèles</div>
       </div>
-      <button id="premium-header-btn" onclick="startCheckout()" style="display:none;margin-left:8px;padding:4px 11px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:7px;color:#fff;font-size:10.5px;font-weight:700;font-family:'Space Grotesk',sans-serif;cursor:pointer;white-space:nowrap;flex-shrink:0">⭐ Premium</button>
+      <button id="premium-header-btn" onclick="openPremiumInfoModal()" style="display:none;margin-left:8px;padding:4px 11px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:7px;color:#fff;font-size:10.5px;font-weight:700;font-family:'Space Grotesk',sans-serif;cursor:pointer;white-space:nowrap;flex-shrink:0">⭐ Premium</button>
+      <div id="premium-badge" style="display:none;margin-left:8px;padding:3px 9px;background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:20px;color:#451a03;font-size:9.5px;font-weight:800;font-family:'JetBrains Mono',monospace;white-space:nowrap;flex-shrink:0;letter-spacing:.5px;box-shadow:0 2px 8px rgba(245,158,11,0.4)">⭐ PREMIUM</div>
       <div class="header-right">
         <div id="token-display" onclick="openSettings()" title="Tokens utilisés — clic pour paramètres">0 tok</div>
         <select id="model-select" onchange="onModelChange()">
@@ -965,7 +966,25 @@
     <p style="font-size:11.5px;color:var(--text2);line-height:1.6">✅ Vérifie ta boîte mail et clique sur le lien pour te connecter (regarde aussi les spams).</p>
   </div>
 </div>
- 
+
+<!-- Pourquoi Premium : comparatif Gratuit vs Premium -->
+<div id="premium-info-backdrop" onclick="closePremiumInfoModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:198;backdrop-filter:blur(4px)"></div>
+<div id="premium-info-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid rgba(245,158,11,0.35);border-radius:14px;padding:22px;width:min(460px,92vw);z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.5);max-height:85vh;overflow-y:auto">
+  <div class="settings-title">⭐ Pourquoi passer Premium ?<button class="settings-close" onclick="closePremiumInfoModal()">×</button></div>
+  <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:16px">
+    <thead>
+      <tr>
+        <th style="text-align:left;padding:6px 4px;color:var(--text4);font-size:9.5px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;border-bottom:1px solid var(--border)">Fonctionnalité</th>
+        <th style="text-align:center;padding:6px 4px;color:var(--text3);font-size:9.5px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;border-bottom:1px solid var(--border)">Gratuit</th>
+        <th style="text-align:center;padding:6px 4px;color:#f59e0b;font-size:9.5px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;border-bottom:1px solid var(--border)">⭐ Premium</th>
+      </tr>
+    </thead>
+    <tbody id="premium-compare-body"></tbody>
+  </table>
+  <button class="settings-btn" style="width:100%;background:linear-gradient(135deg,#f59e0b,#d97706);font-size:12.5px;padding:10px" onclick="closePremiumInfoModal();startCheckout()">⭐ S'abonner — 5€/mois</button>
+  <p style="font-size:9.5px;color:var(--text4);text-align:center;margin-top:8px;font-family:'JetBrains Mono',monospace">Résiliable à tout moment</p>
+</div>
+
 <div id="confirm-backdrop"></div>
 <div id="confirm-dialog">
   <div class="confirm-title">Supprimer la conversation ?</div>
@@ -1616,6 +1635,8 @@ function updateAccountUI(){
   if(el)el.textContent=currentUser?((isPremium?'⭐ ':'☁️ ')+currentUser.email+(isPremium?' · Premium':'')):'👤 Invité (local uniquement)';
   const btn=document.getElementById('premium-header-btn');
   if(btn)btn.style.display=(currentUser&&!isPremium)?'inline-block':'none';
+  const badge=document.getElementById('premium-badge');
+  if(badge)badge.style.display=(currentUser&&isPremium)?'inline-block':'none';
 }
 async function checkPremiumStatus(){
   if(!supa||!currentUser){isPremium=false;updateAccountUI();return}
@@ -1625,6 +1646,32 @@ async function checkPremiumStatus(){
   }catch(e){isPremium=false}
   updateAccountUI();
 }
+// ── COMPARATIF "POURQUOI PREMIUM" ──
+const PREMIUM_COMPARISON=[
+  ['Messages par jour','30/jour','Illimité'],
+  ['Recherche web','15/heure','Illimitée'],
+  ['Export PDF/PowerPoint','Avec filigrane','Sans filigrane'],
+  ['Génération d\'images','Standard','Haute résolution'],
+  ['Templates & prompts','Limités','Illimités'],
+  ['Synchronisation multi-appareils','✓','✓'],
+];
+function openPremiumInfoModal(){
+  if(isPremium){toast('Tu es déjà Premium ⭐');return}
+  const body=document.getElementById('premium-compare-body');
+  body.innerHTML=PREMIUM_COMPARISON.map(([feat,free,premium])=>`
+    <tr>
+      <td style="padding:7px 4px;color:var(--text2);border-bottom:1px solid var(--border)">${feat}</td>
+      <td style="padding:7px 4px;text-align:center;color:var(--text4);border-bottom:1px solid var(--border)">${free}</td>
+      <td style="padding:7px 4px;text-align:center;color:#f59e0b;font-weight:600;border-bottom:1px solid var(--border)">${premium}</td>
+    </tr>`).join('');
+  document.getElementById('premium-info-modal').style.display='block';
+  document.getElementById('premium-info-backdrop').style.display='block';
+}
+function closePremiumInfoModal(){
+  document.getElementById('premium-info-modal').style.display='none';
+  document.getElementById('premium-info-backdrop').style.display='none';
+}
+
 async function startCheckout(){
   if(!currentUser){toast('Connecte-toi d\'abord');closeSettings();openAuthModal();return}
   const btn=document.getElementById('premium-header-btn');
