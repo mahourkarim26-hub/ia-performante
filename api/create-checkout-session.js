@@ -22,6 +22,7 @@ export default async function handler(req, res) {
     'mode': 'subscription',
     'line_items[0][price]': PRICE_ID,
     'line_items[0][quantity]': '1',
+    'subscription_data[trial_period_days]': '3',
     'success_url': origin + '/?premium=success',
     'cancel_url': origin + '/?premium=cancel',
     'client_reference_id': userId,
