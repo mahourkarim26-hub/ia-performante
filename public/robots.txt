@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /?share=
+
+Sitemap: https://ia-performante.vercel.app/sitemap.xml
