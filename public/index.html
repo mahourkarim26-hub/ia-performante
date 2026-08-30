@@ -1681,6 +1681,28 @@ const PREMIUM_COMPARISON=[
   ['Templates & prompts','Limités','Illimités'],
   ['Synchronisation multi-appareils','✓','✓'],
 ];
+// ── AFFICHAGE AUTOMATIQUE DU COMPARATIF PREMIUM ──
+// Montré une seule fois, après quelques messages, à un utilisateur non-premium —
+// jamais reproposé après (ni sur ce fil ni sur un autre).
+const PREMIUM_PROMPT_COUNT_KEY='ia_premium_prompt_count_v1';
+const PREMIUM_PROMPT_SEEN_KEY='ia_premium_prompt_seen_v1';
+const PREMIUM_PROMPT_THRESHOLD=5;
+function trackMessageForPremiumPrompt(){
+  if(isPremium)return;
+  if(localStorage.getItem(PREMIUM_PROMPT_SEEN_KEY))return;
+  const count=parseInt(localStorage.getItem(PREMIUM_PROMPT_COUNT_KEY)||'0')+1;
+  localStorage.setItem(PREMIUM_PROMPT_COUNT_KEY,String(count));
+  if(count>=PREMIUM_PROMPT_THRESHOLD){
+    localStorage.setItem(PREMIUM_PROMPT_SEEN_KEY,'1');
+    setTimeout(()=>{
+      const busy=document.getElementById('landing-page').classList.contains('visible')
+        ||document.getElementById('settings-panel').classList.contains('open')
+        ||document.getElementById('auth-modal').style.display==='block'
+        ||document.getElementById('onboarding-tooltip').classList.contains('open');
+      if(!busy&&!isPremium)openPremiumInfoModal();
+    },700);
+  }
+}
 function openPremiumInfoModal(){
   if(isPremium){toast('Tu es déjà Premium ⭐');return}
   const body=document.getElementById('premium-compare-body');
@@ -2246,7 +2268,7 @@ async function streamCompare(apiMessages){
     return fullText;
   }
   await Promise.all([runOne(modelA,colA),runOne(modelB,colB)]);
-  incrementQuota();updateQuotaBar();
+  incrementQuota();updateQuotaBar();trackMessageForPremiumPrompt();
 }
 function keepCompareAnswer(row,text){
   const c=convs[currentId];if(!c)return;
@@ -2837,7 +2859,7 @@ async function streamReply(apiMessages){
     const mid='m'+Date.now()+Math.random().toString(36).slice(2,6);row.dataset.mid=mid;
     const c=convs[currentId];
     if(c){c.messages.push({id:mid,role:'assistant',content:fullText,displayContent:fullText,ts:Date.now(),chips:[]});c.date=Date.now();save();renderSidebar();updateTokenDisplay();updateCtxBar()}
-    incrementQuota();updateQuotaBar();
+    incrementQuota();updateQuotaBar();trackMessageForPremiumPrompt();
     return fullText;
   }catch(e){
     rmTyping();currentReader=null;
