@@ -762,6 +762,9 @@
           <option value="512x768">512×768 portrait</option>
           <option value="1024x576">1024×576 cinéma</option>
           <option value="1024x1024">1024×1024 HD</option>
+          <option value="1536x1536">1536×1536 ⭐ Premium</option>
+          <option value="1792x1024">1792×1024 ⭐ Premium (paysage)</option>
+          <option value="1024x1792">1024×1792 ⭐ Premium (portrait)</option>
         </select>
         <span class="img-panel-label">Qualité</span>
         <select class="img-panel-select" id="img-enhance">
@@ -1307,7 +1310,12 @@ async function generateImageFromPanel(){
   const rawPrompt=promptInput.value.trim();if(!rawPrompt)return;
   const style=document.getElementById('img-style').value;
   const enhance=document.getElementById('img-enhance').value;
-  const sizeVal=document.getElementById('img-size').value;
+  let sizeVal=document.getElementById('img-size').value;
+  const PREMIUM_SIZES=['1536x1536','1792x1024','1024x1792'];
+  if(PREMIUM_SIZES.includes(sizeVal)&&!isPremium){
+    sizeVal='1024x1024';
+    toast('⭐ Résolution HD réservée aux Premium — génération en 1024×1024 à la place');
+  }
   const count=parseInt(document.getElementById('img-count').value)||1;
   const[w,h]=sizeVal.split('x');
   const fullPrompt=[rawPrompt,style,enhance].filter(Boolean).join(', ');
