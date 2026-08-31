@@ -890,6 +890,7 @@
     <button class="settings-btn secondary" onclick="generateTitle()">✨ Titre IA</button>
     <button class="settings-btn secondary" onclick="shareCurrentConv()">🔗 Partager</button>
     <button class="settings-btn secondary" onclick="openPromptsModal()">📌 Mes prompts</button>
+    <button class="settings-btn secondary" onclick="exportEverything()">📦 Export complet</button>
     <button class="settings-btn secondary" onclick="clearAllConvs()">🗑️ Tout effacer</button>
   </div>
 </div>
@@ -1909,6 +1910,24 @@ function exportConvs(){
   const blob=new Blob([JSON.stringify(convs,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='ia_convs_'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Conversations exportées');
+}
+// ── EXPORT COMPLET (conversations + dossiers + prompts) ──
+// Utile en sauvegarde, ou avant de supprimer un compte : tout ce qui est
+// stocké sur cet appareil, dans un seul fichier téléchargeable.
+function exportEverything(){
+  const bundle={
+    _type:'ia_performante_export_complet',
+    exportedAt:new Date().toISOString(),
+    conversations:convs,
+    folders:folders,
+    prompts:savedPrompts
+  };
+  const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='ia_performante_export_complet_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  closeSettings();
+  toast('📦 Export complet téléchargé ✓');
 }
 function importConvs(input){
   const file=input.files[0];if(!file)return;
